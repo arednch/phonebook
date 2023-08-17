@@ -11,13 +11,13 @@ PKG_MAINTAINER:=Martin Suess
 PKG_SOURCE:=phonebook-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/finfinack/phonebook/tar.gz/${PKG_VERSION}?
 PKG_HASH:=skip
-PKG_BUILD_DEPENDS:=golang/glog
+# PKG_BUILD_DEPENDS:=golang/glog
 PKG_BUILD_PARALLEL:=1
 
 GO_PKG:=github.com/finfinack/phonebook
 
 include $(INCLUDE_DIR)/package.mk
-include ../../lang/golang/golang-package.mk
+include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
 
 define Package/phonebook
   SECTION:=net

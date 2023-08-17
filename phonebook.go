@@ -16,7 +16,7 @@ import (
 var (
 	source  = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
 	path    = flag.String("path", "/www", "Folder to write the phonebooks to locally.")
-	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: yealink,cisco")
+	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: yealink,cisco,snom")
 )
 
 func main() {
@@ -40,6 +40,8 @@ func main() {
 			exporters["cisco"] = &exporter.Cisco{}
 		case "yealink":
 			exporters["yealink"] = &exporter.Yealink{}
+		case "snom":
+			exporters["snom"] = &exporter.Snom{}
 		default:
 			glog.Exitf("unknown exporter %q", exp)
 		}

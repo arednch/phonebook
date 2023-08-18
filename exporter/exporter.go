@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"fmt"
+	"encoding/xml"
 
 	"github.com/finack/phonebook/data"
 )

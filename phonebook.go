@@ -15,8 +15,8 @@ import (
 
 var (
 	source  = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
-	path    = flag.String("path", "/www", "Folder to write the phonebooks to locally.")
-	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: yealink,cisco,snom")
+	path    = flag.String("path", "", "Folder to write the phonebooks to locally.")
+	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: generic,yealink,cisco,snom")
 )
 
 func main() {
@@ -36,6 +36,8 @@ func main() {
 		exp = strings.TrimSpace(exp)
 		exp = strings.ToLower(exp)
 		switch exp {
+		case "generic":
+			exporters["generic"] = &exporter.Generic{}
 		case "cisco":
 			exporters["cisco"] = &exporter.Cisco{}
 		case "yealink":

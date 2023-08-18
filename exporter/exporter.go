@@ -10,27 +10,29 @@ type Exporter interface {
 	Export([]*data.Entry, bool) ([]byte, error)
 }
 
-type GenericPhoneBook struct {
-	Entry []*GenericEntry `xml:"DirectoryEntry"`
-}
-
-type GenericEntry struct {
-	Name      string `xml:"Name"`
-	Telephone string `xml:"Telephone"`
-}
-
-func export(entries []*data.Entry, pbx bool) *GenericPhoneBook {
-	var targetEntries []*GenericEntry
+func export(entries []*data.Entry, pbx bool) *data.GenericPhoneBook {
+	var targetEntries []*data.GenericEntry
 	for _, entry := range entries {
 		tel := entry.IPAddress
 		if pbx {
 			tel = entry.PhoneNumber
 		}
-		targetEntries = append(targetEntries, &GenericEntry{
+		targetEntries = append(targetEntries, &data.GenericEntry{
 			Name:      fmt.Sprintf("%s, %s (%s)", entry.LastName, entry.FirstName, entry.Callsign),
 			Telephone: tel,
 		})
 	}
 
-	return &GenericPhoneBook{Entry: targetEntries}
+	return &data.GenericPhoneBook{Entry: targetEntries}
+}
+
+type Generic struct{}
+
+func (g *Generic) Export(entries []*data.Entry, pbx bool) ([]byte, error) {
+	return xml.MarshalIndent(struct {
+		*data.GenericPhoneBook
+		XMLName struct{} `xml:"IPPhoneDirectory"`
+	}{
+		GenericPhoneBook: export(entries, pbx),
+	}, "", "    ")
 }

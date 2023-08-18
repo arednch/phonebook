@@ -10,7 +10,7 @@ type Yealink struct{}
 
 func (y *Yealink) Export(entries []*data.Entry, pbx bool) ([]byte, error) {
 	return xml.MarshalIndent(struct {
-		*GenericPhoneBook
+		*data.GenericPhoneBook
 		XMLName struct{} `xml:"YealinkIPPhoneDirectory"`
 	}{
 		GenericPhoneBook: export(entries, pbx),

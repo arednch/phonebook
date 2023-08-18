@@ -23,7 +23,7 @@ var (
 	source  = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
 	path    = flag.String("path", "", "Folder to write the phonebooks to locally.")
 	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: generic,yealink,cisco,snom")
-	server  = flag.Bool("server", true, "Phonebook acts as a server when set to true.")
+	server  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 	port    = flag.Int("port", 8080, "Port to listen on (when running as a server).")
 	reload  = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
 )

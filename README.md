@@ -24,3 +24,46 @@ The following pointers provide the necessary starting points:
 - https://openwrt.org/docs/guide-developer/toolchain/use-buildsystem
 - https://openwrt.org/docs/guide-developer/toolchain/single.package
 - https://openwrt.org/docs/guide-developer/packages
+
+## Service
+
+In order to run it as a service, set it up and run it as such:
+
+`/etc/systemd/system/phonebook.service`
+```
+[Unit]
+Description=Phonebook for AREDN.
+
+[Service]
+User=root
+WorkingDirectory=/tmp/
+ExecStart=/usr/bin/phonebook --server=true --port=8080 --source="<insert CSV source>"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The following reloads the services, starts it, enables it to run after reboots and gets its status:
+```
+sudo systemctl daemon-reload
+sudo systemctl start phonebook.service
+sudo systemctl enable phonebook.service
+systemctl status phonebook.service
+```
+
+You could also simplify later re-deployments a bit:
+
+```
+#!/bin/sh
+
+cd /tmp/
+rm -rf phonebook
+git clone https://github.com/finfinack/phonebook.git phonebook
+cd phonebook
+go build .
+
+cp phonebook /usr/bin/
+systemctl restart phonebook.service
+systemctl status phonebook.service
+```

@@ -26,6 +26,9 @@ func main() {
 	if *source == "" {
 		glog.Exit("-source flag needs to be set")
 	}
+	if *path == "" {
+		glog.Exit("-path flag needs to be set")
+	}
 	if *formats == "" {
 		glog.Exit("-formats flag needs to be set")
 	}

@@ -25,6 +25,8 @@ The following pointers provide the necessary starting points:
 - https://openwrt.org/docs/guide-developer/toolchain/single.package
 - https://openwrt.org/docs/guide-developer/packages
 
+See https://github.com/finfinack/aredn-packages/tree/main/phonebook for the definitions we use (they're not quite working as intended yet...)
+
 ## Service
 
 In order to run it as a service, set it up and run it as such:

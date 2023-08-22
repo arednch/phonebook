@@ -156,6 +156,7 @@ func main() {
 		if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats); err != nil {
 			glog.Exit(err)
 		}
+		return
 	}
 
 	go func() {

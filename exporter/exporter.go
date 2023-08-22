@@ -1,10 +1,10 @@
 package exporter
 
 import (
-	"fmt"
 	"encoding/xml"
+	"fmt"
 
-	"github.com/finack/phonebook/data"
+	"github.com/finfinack/phonebook/data"
 )
 
 type Exporter interface {

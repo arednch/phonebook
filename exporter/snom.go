@@ -3,7 +3,7 @@ package exporter
 import (
 	"encoding/xml"
 
-	"github.com/finack/phonebook/data"
+	"github.com/finfinack/phonebook/data"
 )
 
 type Snom struct{}

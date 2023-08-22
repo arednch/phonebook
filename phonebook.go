@@ -14,9 +14,9 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/finack/phonebook/data"
-	"github.com/finack/phonebook/exporter"
-	"github.com/finack/phonebook/importer"
+	"github.com/finfinack/phonebook/data"
+	"github.com/finfinack/phonebook/exporter"
+	"github.com/finfinack/phonebook/importer"
 )
 
 var (

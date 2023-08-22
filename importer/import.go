@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/finack/phonebook/data"
+	"github.com/finfinack/phonebook/data"
 )
 
 const (

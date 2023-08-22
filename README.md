@@ -16,6 +16,28 @@ Read the CSV from a URL and write the XML files in the default folder for Yealin
 go run phonebook.go -source='http://aredn-node.local.mesh:8080/phonebook.csv' -formats='yealink,cisco'
 ```
 
+Optionally, instead of passing flags, the config values can be read from a config file too:
+
+```
+go run . -conf="config"
+```
+
+The corresponding `config` file could look like this:
+
+```
+{
+	"source": "http://aredn-node.local.mesh:8080/phonebook.csv",
+	"path": "/tmp/",
+	"formats": [
+		"yealink",
+    "cisco"
+	],
+	"server": true,
+	"port": 8080,
+	"reload_seconds": 3600
+}
+```
+
 ## OpenWRT / AREDN
 
 In order to run this on an AREDN node, the `Makefile` in `openwrt` needs to be built into a package.

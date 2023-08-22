@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"github.com/finfinack/phonebook/configuration"
 	"github.com/finfinack/phonebook/data"
 	"github.com/finfinack/phonebook/exporter"
 	"github.com/finfinack/phonebook/importer"
@@ -26,6 +27,8 @@ var (
 	server  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 	port    = flag.Int("port", 8080, "Port to listen on (when running as a server).")
 	reload  = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
+
+	conf = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
 )
 
 var (
@@ -115,38 +118,57 @@ func main() {
 		"snom":    &exporter.Snom{},
 	}
 
-	if *source == "" {
-		glog.Exit("-source flag needs to be set")
+	// Attempt to read config from file, else use flag values.
+	var cfg *configuration.Config
+	if *conf != "" {
+		if c, err := configuration.Read(*conf); err != nil {
+			glog.Exit(err)
+		} else {
+			c.Reload = time.Duration(c.ReloadSeconds) * time.Second
+			cfg = c
+		}
+	} else {
+		cfg = &configuration.Config{
+			Source:  *source,
+			Path:    *path,
+			Formats: strings.Split(*formats, ","),
+			Server:  *server,
+			Port:    *port,
+			Reload:  *reload,
+		}
 	}
 
-	if !*server {
-		if *path == "" {
-			glog.Exit("-path flag needs to be set")
+	if cfg.Source == "" {
+		glog.Exit("source needs to be set")
+	}
+
+	if !cfg.Server {
+		if cfg.Path == "" {
+			glog.Exit("path needs to be set")
 		}
-		if *formats == "" {
-			glog.Exit("-formats flag needs to be set")
+		if len(cfg.Formats) == 0 {
+			glog.Exit("formats needs to be set")
 		}
 
-		if err := refreshRecords(*source); err != nil {
+		if err := refreshRecords(cfg.Source); err != nil {
 			glog.Exit(err)
 		}
-		exportFormats := strings.Split(*formats, ",")
-		if err := exportOnce(*source, *path, exportFormats); err != nil {
+		if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats); err != nil {
 			glog.Exit(err)
 		}
 	}
 
 	go func() {
 		for {
-			if err := refreshRecords(*source); err != nil {
+			if err := refreshRecords(cfg.Source); err != nil {
 				glog.Warningf("error refreshing data from upstream: %s", err)
 			}
-			time.Sleep(*reload)
+			time.Sleep(cfg.Reload)
 		}
 	}()
 
 	http.HandleFunc("/phonebook", servePhonebook)
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		glog.Exit(err)
 	}

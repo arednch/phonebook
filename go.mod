@@ -1,4 +1,4 @@
-module github.com/finack/phonebook
+module github.com/finfinack/phonebook
 
 go 1.20
 

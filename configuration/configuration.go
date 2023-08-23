@@ -7,12 +7,17 @@ import (
 )
 
 type Config struct {
-	Source  string   `json:"source"`
-	Path    string   `json:"path"`
-	Formats []string `json:"formats"`
-	Server  bool     `json:"server"`
-	Port    int      `json:"port"`
+	// Generally applicable.
+	Source  string `json:"source"`
+	Path    string `json:"path"`
+	Server  bool   `json:"server"`
+	Resolve bool   `json:"resolve"`
 
+	// Only relevant when running in non-server / ad-hoc mode.
+	Formats []string `json:"formats"`
+
+	// Only relevant when running in server mode.
+	Port          int `json:"port"`
 	ReloadSeconds int `json:"reload_seconds"`
 	Reload        time.Duration
 }

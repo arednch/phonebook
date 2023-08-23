@@ -18,17 +18,29 @@ import (
 	"github.com/finfinack/phonebook/data"
 	"github.com/finfinack/phonebook/exporter"
 	"github.com/finfinack/phonebook/importer"
+	"github.com/finfinack/phonebook/olsr"
 )
 
 var (
+	// Generally applicable flags.
 	source  = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
 	path    = flag.String("path", "", "Folder to write the phonebooks to locally.")
-	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: generic,yealink,cisco,snom")
 	server  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
-	port    = flag.Int("port", 8080, "Port to listen on (when running as a server).")
-	reload  = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
+	resolve = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OSLR data.")
+
+	// Only relevant when running in non-server / ad-hoc mode.
+	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: generic,yealink,cisco,snom")
+
+	// Only relevant when running in server mode.
+	port   = flag.Int("port", 8080, "Port to listen on (when running as a server).")
+	reload = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
 
 	conf = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
+)
+
+const (
+	oslrFile     = "/tmp/run/hosts_olsr.stable"
+	sipSeparator = "@"
 )
 
 var (
@@ -38,10 +50,29 @@ var (
 	exporters map[string]exporter.Exporter
 )
 
-func refreshRecords(source string) error {
+func refreshRecords(source string, resolve bool) error {
 	rec, err := importer.ReadPhonebook(source)
 	if err != nil {
 		return err
+	}
+
+	if resolve {
+		oslrData, err := olsr.Read(oslrFile)
+		if err != nil {
+			return err
+		}
+		for _, e := range rec {
+			addrParts := strings.Split(e.IPAddress, sipSeparator)
+			if len(addrParts) != 2 {
+				continue
+			}
+			hostname := addrParts[1]
+			o, ok := oslrData[strings.Split(hostname, ".")[0]]
+			if !ok {
+				continue
+			}
+			e.IPAddress = o.IP
+		}
 	}
 
 	recordsMu.Lock()
@@ -131,8 +162,9 @@ func main() {
 		cfg = &configuration.Config{
 			Source:  *source,
 			Path:    *path,
-			Formats: strings.Split(*formats, ","),
 			Server:  *server,
+			Resolve: *resolve,
+			Formats: strings.Split(*formats, ","),
 			Port:    *port,
 			Reload:  *reload,
 		}
@@ -150,7 +182,7 @@ func main() {
 			glog.Exit("formats needs to be set")
 		}
 
-		if err := refreshRecords(cfg.Source); err != nil {
+		if err := refreshRecords(cfg.Source, cfg.Resolve); err != nil {
 			glog.Exit(err)
 		}
 		if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats); err != nil {
@@ -161,7 +193,7 @@ func main() {
 
 	go func() {
 		for {
-			if err := refreshRecords(cfg.Source); err != nil {
+			if err := refreshRecords(cfg.Source, cfg.Resolve); err != nil {
 				glog.Warningf("error refreshing data from upstream: %s", err)
 			}
 			time.Sleep(cfg.Reload)

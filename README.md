@@ -28,11 +28,12 @@ The corresponding `config` file could look like this:
 {
 	"source": "http://aredn-node.local.mesh:8080/phonebook.csv",
 	"path": "/tmp/",
+	"server": true,
+	"resolve": false,
 	"formats": [
 		"yealink",
     "cisco"
 	],
-	"server": true,
 	"port": 8080,
 	"reload_seconds": 3600
 }

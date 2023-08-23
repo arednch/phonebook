@@ -4,7 +4,9 @@
 ### Custom ###
 
 phonebook
+phonebook.csv
 config
+hosts_olsr.stable
 
 ### Go ###
 # Binaries for programs and plugins

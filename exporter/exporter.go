@@ -21,7 +21,6 @@ func export(entries []*data.Entry, direct, resolve, indicateActive, filterInacti
 		if filterInactive && entry.OLSR == nil {
 			continue // ignoring inactive entry (no OLSR data)
 		}
-		fmt.Printf("%+v\n", entry)
 
 		var pfx string
 		if indicateActive && entry.OLSR != nil {

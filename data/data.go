@@ -8,6 +8,9 @@ type Entry struct {
 	Callsign    string
 	IPAddress   string
 	PhoneNumber string
+
+	// Metadata
+	OLSR *OLSR // if present, the participant seems to be active
 }
 
 // Target

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -23,24 +24,25 @@ import (
 
 var (
 	// Generally applicable flags.
-	source  = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
-	path    = flag.String("path", "", "Folder to write the phonebooks to locally.")
-	server  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
-	resolve = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OSLR data.")
+	source   = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
+	olsrFile = flag.String("olsr", "/tmp/run/hosts_olsr.stable", "Path to the OLSR hosts file.")
+	server   = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
-	formats = flag.String("formats", "pbx,direct", "Comma separated list of formats to export. Supported: pbx,direct")
-	targets = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom")
+	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
+	formats        = flag.String("formats", "pbx,direct", "Comma separated list of formats to export. Supported: pbx,direct")
+	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom")
+	resolve        = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OSLR data.")
+	indicateActive = flag.Bool("indicate_active", false, "Prefixes active participants in the phonebook with `[A]`.")
+	filterInactive = flag.Bool("filter_inactive", false, "Filters inactive participants to not show in the phonebook.")
 
 	// Only relevant when running in server mode.
 	port   = flag.Int("port", 8080, "Port to listen on (when running as a server).")
 	reload = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
-
-	conf = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
+	conf   = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
 )
 
 const (
-	oslrFile     = "/tmp/run/hosts_olsr.stable"
 	sipSeparator = "@"
 )
 
@@ -51,14 +53,14 @@ var (
 	exporters map[string]exporter.Exporter
 )
 
-func refreshRecords(source string, resolve bool) error {
+func refreshRecords(source, olsrFile string) error {
 	rec, err := importer.ReadPhonebook(source)
 	if err != nil {
 		return err
 	}
 
-	if resolve {
-		oslrData, err := olsr.Read(oslrFile)
+	if _, err := os.Stat(olsrFile); err == nil {
+		oslrData, err := olsr.Read(olsrFile)
 		if err != nil {
 			return err
 		}
@@ -72,7 +74,7 @@ func refreshRecords(source string, resolve bool) error {
 			if !ok {
 				continue
 			}
-			e.IPAddress = o.IP
+			e.OLSR = o
 		}
 	}
 
@@ -112,7 +114,25 @@ func servePhonebook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := exp.Export(records, direct)
+	var resolve bool
+	res := r.FormValue("resolve")
+	if strings.ToLower(strings.TrimSpace(res)) == "true" {
+		resolve = true
+	}
+
+	var indicateActive bool
+	ia := r.FormValue("ia")
+	if strings.ToLower(strings.TrimSpace(ia)) == "true" {
+		indicateActive = true
+	}
+
+	var filterInactive bool
+	fi := r.FormValue("fi")
+	if strings.ToLower(strings.TrimSpace(fi)) == "true" {
+		filterInactive = true
+	}
+
+	body, err := exp.Export(records, direct, resolve, indicateActive, filterInactive)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -120,7 +140,7 @@ func servePhonebook(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, string(body))
 }
 
-func exportOnce(source, path string, formats, targets []string) error {
+func exportOnce(source, path string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
 	for _, outTgt := range targets {
 		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
 		exp, ok := exporters[outTgt]
@@ -131,14 +151,14 @@ func exportOnce(source, path string, formats, targets []string) error {
 		for _, outFmt := range formats {
 			switch strings.ToLower(strings.TrimSpace(outFmt)) {
 			case "d", "direct": // Direct calling phonebook.
-				body, err := exp.Export(records, true)
+				body, err := exp.Export(records, true, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
-				body, err := exp.Export(records, true)
+				body, err := exp.Export(records, true, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
@@ -148,6 +168,52 @@ func exportOnce(source, path string, formats, targets []string) error {
 				glog.Exitf("unknown format: %q", outFmt)
 			}
 		}
+	}
+
+	return nil
+}
+
+func runServer(cfg *configuration.Config) error {
+	if cfg.Source == "" {
+		return errors.New("source needs to be set")
+	}
+
+	go func() {
+		for {
+			if err := refreshRecords(cfg.Source, cfg.OLSRFile); err != nil {
+				glog.Warningf("error refreshing data from upstream: %s", err)
+			}
+			time.Sleep(cfg.Reload)
+		}
+	}()
+
+	http.HandleFunc("/phonebook", servePhonebook)
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
+	if err != nil {
+		glog.Exit(err)
+	}
+	return http.Serve(listener, nil)
+}
+
+func runLocal(source, path, olsrFile string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
+	if source == "" {
+		return errors.New("source needs to be set")
+	}
+	if path == "" {
+		return errors.New("path needs to be set")
+	}
+	if len(formats) == 0 {
+		return errors.New("formats needs to be set")
+	}
+	if len(targets) == 0 {
+		return errors.New("targets needs to be set")
+	}
+
+	if err := refreshRecords(source, olsrFile); err != nil {
+		return err
+	}
+	if err := exportOnce(source, path, formats, targets, resolve, indicateActive, filterInactive); err != nil {
+		return err
 	}
 
 	return nil
@@ -164,65 +230,30 @@ func main() {
 		"snom":    &exporter.Snom{},
 	}
 
-	// Attempt to read config from file, else use flag values.
-	var cfg *configuration.Config
-	if *conf != "" {
-		if c, err := configuration.Read(*conf); err != nil {
-			glog.Exit(err)
+	if *server || *conf != "" {
+		var cfg *configuration.Config
+		if *conf != "" {
+			if c, err := configuration.Read(*conf); err != nil {
+				glog.Exit(err)
+			} else {
+				c.Reload = time.Duration(c.ReloadSeconds) * time.Second
+				cfg = c
+			}
 		} else {
-			c.Reload = time.Duration(c.ReloadSeconds) * time.Second
-			cfg = c
+			cfg = &configuration.Config{
+				Source:   *source,
+				OLSRFile: *olsrFile,
+				Port:     *port,
+				Reload:   *reload,
+			}
+		}
+
+		if err := runServer(cfg); err != nil {
+			glog.Exit(err)
 		}
 	} else {
-		cfg = &configuration.Config{
-			Source:  *source,
-			Path:    *path,
-			Server:  *server,
-			Resolve: *resolve,
-			Formats: strings.Split(*formats, ","),
-			Targets: strings.Split(*targets, ","),
-			Port:    *port,
-			Reload:  *reload,
-		}
-	}
-
-	if cfg.Source == "" {
-		glog.Exit("source needs to be set")
-	}
-
-	if !cfg.Server {
-		if cfg.Path == "" {
-			glog.Exit("path needs to be set")
-		}
-		if len(cfg.Formats) == 0 {
-			glog.Exit("formats needs to be set")
-		}
-		if len(cfg.Targets) == 0 {
-			glog.Exit("targets needs to be set")
-		}
-
-		if err := refreshRecords(cfg.Source, cfg.Resolve); err != nil {
+		if err := runLocal(*source, *path, *olsrFile, strings.Split(*formats, ","), strings.Split(*targets, ","), *resolve, *indicateActive, *filterInactive); err != nil {
 			glog.Exit(err)
 		}
-		if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats, cfg.Targets); err != nil {
-			glog.Exit(err)
-		}
-		return
 	}
-
-	go func() {
-		for {
-			if err := refreshRecords(cfg.Source, cfg.Resolve); err != nil {
-				glog.Warningf("error refreshing data from upstream: %s", err)
-			}
-			time.Sleep(cfg.Reload)
-		}
-	}()
-
-	http.HandleFunc("/phonebook", servePhonebook)
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
-	if err != nil {
-		glog.Exit(err)
-	}
-	http.Serve(listener, nil)
 }

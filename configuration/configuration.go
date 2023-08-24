@@ -8,16 +8,9 @@ import (
 
 type Config struct {
 	// Generally applicable.
-	Source  string   `json:"source"`
-	Path    string   `json:"path"`
-	Server  bool     `json:"server"`
-	Resolve bool     `json:"resolve"`
-	Formats []string `json:"formats"`
+	Source   string `json:"source"`
+	OLSRFile string `json:"olsr_file"`
 
-	// Only relevant when running in non-server / ad-hoc mode.
-	Targets []string `json:"targets"`
-
-	// Only relevant when running in server mode.
 	Port          int `json:"port"`
 	ReloadSeconds int `json:"reload_seconds"`
 	Reload        time.Duration

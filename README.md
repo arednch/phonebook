@@ -115,10 +115,24 @@ A typical file would look like this:
 {
 	"source": "http://aredn-node.local.mesh:8080/phonebook.csv",
 	"olsr_file": "/tmp/run/hosts_olsr.stable",
+	"server": false,
+  "path": "/www",
+	"formats": [
+		"direct",
+		"pbx"
+	],
+	"targets": [
+		"yealink"
+	],
+	"resolve": false,
+	"indicate_active": true,
+	"filter_inactive": false,
 	"port": 8080,
 	"reload_seconds": 3600
 }
 ```
+
+The config allows to set the same paramaters as the flags (modulo the `conf` flag).
 
 ### Queries
 

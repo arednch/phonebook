@@ -10,7 +10,17 @@ type Config struct {
 	// Generally applicable.
 	Source   string `json:"source"`
 	OLSRFile string `json:"olsr_file"`
+	Server   bool   `json:"server"`
 
+	// Only relevant when running in non-server / ad-hoc mode.
+	Path           string   `json:"path"`
+	Formats        []string `json:"formats"`
+	Targets        []string `json:"targets"`
+	Resolve        bool     `json:"resolve"`
+	IndicateActive bool     `json:"indicate_active"`
+	FilterInactive bool     `json:"filter_inactive"`
+
+	// Only relevant when running in server mode.
 	Port          int `json:"port"`
 	ReloadSeconds int `json:"reload_seconds"`
 	Reload        time.Duration

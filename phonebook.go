@@ -24,6 +24,7 @@ import (
 
 var (
 	// Generally applicable flags.
+	conf     = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
 	source   = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
 	olsrFile = flag.String("olsr", "/tmp/run/hosts_olsr.stable", "Path to the OLSR hosts file.")
 	server   = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
@@ -39,7 +40,6 @@ var (
 	// Only relevant when running in server mode.
 	port   = flag.Int("port", 8080, "Port to listen on (when running as a server).")
 	reload = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
-	conf   = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
 )
 
 const (
@@ -145,7 +145,7 @@ func exportOnce(source, path string, formats, targets []string, resolve, indicat
 		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
 		exp, ok := exporters[outTgt]
 		if !ok {
-			glog.Exitf("unknown exporter %q", outTgt)
+			glog.Exitf("unknown target %q", outTgt)
 		}
 
 		for _, outFmt := range formats {
@@ -158,7 +158,7 @@ func exportOnce(source, path string, formats, targets []string, resolve, indicat
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
-				body, err := exp.Export(records, true, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records, false, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
@@ -195,24 +195,11 @@ func runServer(cfg *configuration.Config) error {
 	return http.Serve(listener, nil)
 }
 
-func runLocal(source, path, olsrFile string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
-	if source == "" {
-		return errors.New("source needs to be set")
-	}
-	if path == "" {
-		return errors.New("path needs to be set")
-	}
-	if len(formats) == 0 {
-		return errors.New("formats needs to be set")
-	}
-	if len(targets) == 0 {
-		return errors.New("targets needs to be set")
-	}
-
-	if err := refreshRecords(source, olsrFile); err != nil {
+func runLocal(cfg *configuration.Config) error {
+	if err := refreshRecords(cfg.Source, cfg.OLSRFile); err != nil {
 		return err
 	}
-	if err := exportOnce(source, path, formats, targets, resolve, indicateActive, filterInactive); err != nil {
+	if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive); err != nil {
 		return err
 	}
 
@@ -230,29 +217,50 @@ func main() {
 		"snom":    &exporter.Snom{},
 	}
 
-	if *server || *conf != "" {
-		var cfg *configuration.Config
-		if *conf != "" {
-			if c, err := configuration.Read(*conf); err != nil {
-				glog.Exit(err)
-			} else {
-				c.Reload = time.Duration(c.ReloadSeconds) * time.Second
-				cfg = c
-			}
+	var cfg *configuration.Config
+	if *conf != "" {
+		if c, err := configuration.Read(*conf); err != nil {
+			glog.Exit(err)
 		} else {
-			cfg = &configuration.Config{
-				Source:   *source,
-				OLSRFile: *olsrFile,
-				Port:     *port,
-				Reload:   *reload,
-			}
+			c.Reload = time.Duration(c.ReloadSeconds) * time.Second
+			cfg = c
 		}
+	} else {
+		cfg = &configuration.Config{
+			Source:         *source,
+			OLSRFile:       *olsrFile,
+			Server:         *server,
+			Path:           *path,
+			Formats:        strings.Split(*formats, ","),
+			Targets:        strings.Split(*targets, ","),
+			Resolve:        *resolve,
+			IndicateActive: *indicateActive,
+			FilterInactive: *filterInactive,
+			Port:           *port,
+			Reload:         *reload,
+		}
+	}
 
+	if cfg.Source == "" {
+		glog.Exit("source needs to be set")
+	}
+
+	if cfg.Server {
 		if err := runServer(cfg); err != nil {
 			glog.Exit(err)
 		}
 	} else {
-		if err := runLocal(*source, *path, *olsrFile, strings.Split(*formats, ","), strings.Split(*targets, ","), *resolve, *indicateActive, *filterInactive); err != nil {
+		if cfg.Path == "" {
+			glog.Exit("path needs to be set")
+		}
+		if len(cfg.Formats) == 0 {
+			glog.Exit("formats needs to be set")
+		}
+		if len(cfg.Targets) == 0 {
+			glog.Exit("targets needs to be set")
+		}
+
+		if err := runLocal(cfg); err != nil {
 			glog.Exit(err)
 		}
 	}

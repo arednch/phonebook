@@ -29,7 +29,8 @@ var (
 	resolve = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OSLR data.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
-	formats = flag.String("formats", "", "Comma separated list of formats to export. Supported: generic,yealink,cisco,snom")
+	formats = flag.String("formats", "pbx,direct", "Comma separated list of formats to export. Supported: pbx,direct")
+	targets = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom")
 
 	// Only relevant when running in server mode.
 	port   = flag.Int("port", 8080, "Port to listen on (when running as a server).")
@@ -85,24 +86,33 @@ func refreshRecords(source string, resolve bool) error {
 func servePhonebook(w http.ResponseWriter, r *http.Request) {
 	format := r.FormValue("format")
 	if format == "" {
-		http.Error(w, "'format' must be specified.", http.StatusBadRequest)
+		http.Error(w, "'format' must be specified: [direct,pbx]", http.StatusBadRequest)
 		return
 	}
-	p := r.FormValue("pbx")
-	if p == "" {
-		http.Error(w, "'pbx' must be specified (true/false).", http.StatusBadRequest)
+	var direct bool
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "d", "direct":
+		direct = true
+	case "p", "pbx":
+		direct = false
+	default:
+		http.Error(w, "'format' must be specified: [direct,pbx]", http.StatusBadRequest)
 		return
 	}
-	pbx := p == "true" || p == "pbx"
 
-	outFmt := strings.ToLower(strings.TrimSpace(format))
-	exp, ok := exporters[outFmt]
+	target := r.FormValue("target")
+	if target == "" {
+		http.Error(w, "'target' must be specified: [generic,cisco,snom,yealink]", http.StatusBadRequest)
+		return
+	}
+	outTgt := strings.ToLower(strings.TrimSpace(target))
+	exp, ok := exporters[outTgt]
 	if !ok {
-		http.Error(w, "Unknown format.", http.StatusBadRequest)
+		http.Error(w, "Unknown target.", http.StatusBadRequest)
 		return
 	}
 
-	body, err := exp.Export(records, pbx)
+	body, err := exp.Export(records, direct)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -110,29 +120,34 @@ func servePhonebook(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, string(body))
 }
 
-func exportOnce(source string, path string, formats []string) error {
-	for _, outFmt := range formats {
-		outFmt := strings.ToLower(strings.TrimSpace(outFmt))
-		exp, ok := exporters[outFmt]
+func exportOnce(source, path string, formats, targets []string) error {
+	for _, outTgt := range targets {
+		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
+		exp, ok := exporters[outTgt]
 		if !ok {
-			glog.Exitf("unknown exporter %q", outFmt)
+			glog.Exitf("unknown exporter %q", outTgt)
 		}
 
-		// Direct calling phonebook.
-		body, err := exp.Export(records, false)
-		if err != nil {
-			return err
+		for _, outFmt := range formats {
+			switch strings.ToLower(strings.TrimSpace(outFmt)) {
+			case "d", "direct": // Direct calling phonebook.
+				body, err := exp.Export(records, true)
+				if err != nil {
+					return err
+				}
+				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
+				os.WriteFile(outpath, body, 0644)
+			case "p", "pbx": // PBX calling phonebook.
+				body, err := exp.Export(records, true)
+				if err != nil {
+					return err
+				}
+				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outTgt))
+				os.WriteFile(outpath, body, 0644)
+			default:
+				glog.Exitf("unknown format: %q", outFmt)
+			}
 		}
-		outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outFmt))
-		os.WriteFile(outpath, body, 0644)
-
-		// PBX calling phonebook.
-		body, err = exp.Export(records, true)
-		if err != nil {
-			return err
-		}
-		outpath = filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outFmt))
-		os.WriteFile(outpath, body, 0644)
 	}
 
 	return nil
@@ -165,6 +180,7 @@ func main() {
 			Server:  *server,
 			Resolve: *resolve,
 			Formats: strings.Split(*formats, ","),
+			Targets: strings.Split(*targets, ","),
 			Port:    *port,
 			Reload:  *reload,
 		}
@@ -181,11 +197,14 @@ func main() {
 		if len(cfg.Formats) == 0 {
 			glog.Exit("formats needs to be set")
 		}
+		if len(cfg.Targets) == 0 {
+			glog.Exit("targets needs to be set")
+		}
 
 		if err := refreshRecords(cfg.Source, cfg.Resolve); err != nil {
 			glog.Exit(err)
 		}
-		if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats); err != nil {
+		if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats, cfg.Targets); err != nil {
 			glog.Exit(err)
 		}
 		return

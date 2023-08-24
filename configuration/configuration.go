@@ -8,13 +8,14 @@ import (
 
 type Config struct {
 	// Generally applicable.
-	Source  string `json:"source"`
-	Path    string `json:"path"`
-	Server  bool   `json:"server"`
-	Resolve bool   `json:"resolve"`
+	Source  string   `json:"source"`
+	Path    string   `json:"path"`
+	Server  bool     `json:"server"`
+	Resolve bool     `json:"resolve"`
+	Formats []string `json:"formats"`
 
 	// Only relevant when running in non-server / ad-hoc mode.
-	Formats []string `json:"formats"`
+	Targets []string `json:"targets"`
 
 	// Only relevant when running in server mode.
 	Port          int `json:"port"`

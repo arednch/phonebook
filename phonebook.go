@@ -13,8 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
-
 	"github.com/finfinack/phonebook/configuration"
 	"github.com/finfinack/phonebook/data"
 	"github.com/finfinack/phonebook/exporter"
@@ -145,7 +143,7 @@ func exportOnce(source, path string, formats, targets []string, resolve, indicat
 		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
 		exp, ok := exporters[outTgt]
 		if !ok {
-			glog.Exitf("unknown target %q", outTgt)
+			return fmt.Errorf("unknown target %q", outTgt)
 		}
 
 		for _, outFmt := range formats {
@@ -165,7 +163,7 @@ func exportOnce(source, path string, formats, targets []string, resolve, indicat
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			default:
-				glog.Exitf("unknown format: %q", outFmt)
+				return fmt.Errorf("unknown format: %q", outFmt)
 			}
 		}
 	}
@@ -181,7 +179,7 @@ func runServer(cfg *configuration.Config) error {
 	go func() {
 		for {
 			if err := refreshRecords(cfg.Source, cfg.OLSRFile); err != nil {
-				glog.Warningf("error refreshing data from upstream: %s", err)
+				fmt.Printf("error refreshing data from upstream: %s\n", err)
 			}
 			time.Sleep(cfg.Reload)
 		}
@@ -190,7 +188,7 @@ func runServer(cfg *configuration.Config) error {
 	http.HandleFunc("/phonebook", servePhonebook)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
-		glog.Exit(err)
+		return err
 	}
 	return http.Serve(listener, nil)
 }
@@ -220,7 +218,8 @@ func main() {
 	var cfg *configuration.Config
 	if *conf != "" {
 		if c, err := configuration.Read(*conf); err != nil {
-			glog.Exit(err)
+			fmt.Printf("unable to read config: %s\n", err)
+			os.Exit(1)
 		} else {
 			c.Reload = time.Duration(c.ReloadSeconds) * time.Second
 			cfg = c
@@ -242,26 +241,32 @@ func main() {
 	}
 
 	if cfg.Source == "" {
-		glog.Exit("source needs to be set")
+		fmt.Println("source needs to be set")
+		os.Exit(1)
 	}
 
 	if cfg.Server {
 		if err := runServer(cfg); err != nil {
-			glog.Exit(err)
+			fmt.Printf("unable to run server: %s\n", err)
+			os.Exit(1)
 		}
 	} else {
 		if cfg.Path == "" {
-			glog.Exit("path needs to be set")
+			fmt.Println("path needs to be set")
+			os.Exit(1)
 		}
 		if len(cfg.Formats) == 0 {
-			glog.Exit("formats needs to be set")
+			fmt.Println("formats need to be set")
+			os.Exit(1)
 		}
 		if len(cfg.Targets) == 0 {
-			glog.Exit("targets needs to be set")
+			fmt.Println("targets need to be set")
+			os.Exit(1)
 		}
 
 		if err := runLocal(cfg); err != nil {
-			glog.Exit(err)
+			fmt.Printf("unable to run: %s\n", err)
+			os.Exit(1)
 		}
 	}
 }

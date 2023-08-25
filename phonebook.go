@@ -86,7 +86,7 @@ func refreshRecords(source, olsrFile string) error {
 func servePhonebook(w http.ResponseWriter, r *http.Request) {
 	f := r.FormValue("format")
 	if f == "" {
-		http.Error(w, "'format' must be specified: [direct,pbx]", http.StatusBadRequest)
+		http.Error(w, "'format' must be specified: [direct,pbx,combined]", http.StatusBadRequest)
 		return
 	}
 	var format exporter.Format

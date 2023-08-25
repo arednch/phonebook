@@ -15,8 +15,8 @@ Only relevant when running in **non-server / ad-hoc mode**:
 - `path`: Folder to write the phonebooks to locally. Default: ""
 - `formats`: Comma separated list of formats to export.
 
-		- Supported: pbx,direct
-		- Default: "pbx,direct"
+		- Supported: combined
+		- Default: "pbx,direct,combined"
 
 - `targets`: Comma separated list of targets to export.
 
@@ -119,7 +119,8 @@ A typical file would look like this:
   "path": "/www",
 	"formats": [
 		"direct",
-		"pbx"
+		"pbx",
+		"combined"
 	],
 	"targets": [
 		"yealink"
@@ -138,7 +139,7 @@ The config allows to set the same paramaters as the flags (modulo the `conf` fla
 
 The server can then be queried as follows (replace "server" and "port" accordingly):
 
-http://server:port/phonebook?target=yealink&format=pbx
+http://server:port/phonebook?target=yealink&format=combined
 
 The same formats and targets as if run from the commandline are supported.
 

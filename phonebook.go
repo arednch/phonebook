@@ -29,7 +29,7 @@ var (
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
-	formats        = flag.String("formats", "pbx,direct", "Comma separated list of formats to export. Supported: pbx,direct")
+	formats        = flag.String("formats", "combined", "Comma separated list of formats to export. Supported: pbx,direct,combined")
 	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom")
 	resolve        = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OSLR data.")
 	indicateActive = flag.Bool("indicate_active", false, "Prefixes active participants in the phonebook with `[A]`.")
@@ -84,19 +84,21 @@ func refreshRecords(source, olsrFile string) error {
 }
 
 func servePhonebook(w http.ResponseWriter, r *http.Request) {
-	format := r.FormValue("format")
-	if format == "" {
+	f := r.FormValue("format")
+	if f == "" {
 		http.Error(w, "'format' must be specified: [direct,pbx]", http.StatusBadRequest)
 		return
 	}
-	var direct bool
-	switch strings.ToLower(strings.TrimSpace(format)) {
+	var format exporter.Format
+	switch strings.ToLower(strings.TrimSpace(f)) {
 	case "d", "direct":
-		direct = true
+		format = exporter.FormatDirect
 	case "p", "pbx":
-		direct = false
+		format = exporter.FormatPBX
+	case "c", "combined":
+		format = exporter.FormatCombined
 	default:
-		http.Error(w, "'format' must be specified: [direct,pbx]", http.StatusBadRequest)
+		http.Error(w, "'format' must be specified: [direct,pbx,combined]", http.StatusBadRequest)
 		return
 	}
 
@@ -130,7 +132,7 @@ func servePhonebook(w http.ResponseWriter, r *http.Request) {
 		filterInactive = true
 	}
 
-	body, err := exp.Export(records, direct, resolve, indicateActive, filterInactive)
+	body, err := exp.Export(records, format, resolve, indicateActive, filterInactive)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -149,18 +151,25 @@ func exportOnce(source, path string, formats, targets []string, resolve, indicat
 		for _, outFmt := range formats {
 			switch strings.ToLower(strings.TrimSpace(outFmt)) {
 			case "d", "direct": // Direct calling phonebook.
-				body, err := exp.Export(records, true, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records, exporter.FormatDirect, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
-				body, err := exp.Export(records, false, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records, exporter.FormatPBX, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outTgt))
+				os.WriteFile(outpath, body, 0644)
+			case "c", "combined":
+				body, err := exp.Export(records, exporter.FormatCombined, resolve, indicateActive, filterInactive)
+				if err != nil {
+					return err
+				}
+				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			default:
 				return fmt.Errorf("unknown format: %q", outFmt)

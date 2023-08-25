@@ -20,6 +20,6 @@ type GenericPhoneBook struct {
 }
 
 type GenericEntry struct {
-	Name      string `xml:"Name"`
-	Telephone string `xml:"Telephone"`
+	Name      string   `xml:"Name"`
+	Telephone []string `xml:"Telephone"`
 }

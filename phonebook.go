@@ -169,7 +169,7 @@ func exportOnce(source, path string, formats, targets []string, resolve, indicat
 				if err != nil {
 					return err
 				}
-				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s.xml", outTgt))
+				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_combined.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			default:
 				return fmt.Errorf("unknown format: %q", outFmt)

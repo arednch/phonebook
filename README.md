@@ -139,7 +139,7 @@ The config allows to set the same paramaters as the flags (modulo the `conf` fla
 
 The server can then be queried as follows (replace "server" and "port" accordingly):
 
-http://server:port/phonebook?target=yealink&format=combined
+http://server:port/phonebook?target=generic&format=combined
 
 The same formats and targets as if run from the commandline are supported.
 

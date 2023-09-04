@@ -32,8 +32,9 @@ var (
 	formats        = flag.String("formats", "combined", "Comma separated list of formats to export. Supported: pbx,direct,combined")
 	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom")
 	resolve        = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OSLR data.")
-	indicateActive = flag.Bool("indicate_active", false, "Prefixes active participants in the phonebook with `[A]`.")
+	indicateActive = flag.Bool("indicate_active", false, "Prefixes active participants in the phonebook with -active_pfx.")
 	filterInactive = flag.Bool("filter_inactive", false, "Filters inactive participants to not show in the phonebook.")
+	activePfx      = flag.String("active_pfx", "*", "Prefix to add when -indicate_active is set.")
 
 	// Only relevant when running in server mode.
 	port   = flag.Int("port", 8080, "Port to listen on (when running as a server).")
@@ -83,7 +84,11 @@ func refreshRecords(source, olsrFile string) error {
 	return nil
 }
 
-func servePhonebook(w http.ResponseWriter, r *http.Request) {
+type Server struct {
+	Config *configuration.Config
+}
+
+func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 	f := r.FormValue("format")
 	if f == "" {
 		http.Error(w, "'format' must be specified: [direct,pbx,combined]", http.StatusBadRequest)
@@ -132,7 +137,7 @@ func servePhonebook(w http.ResponseWriter, r *http.Request) {
 		filterInactive = true
 	}
 
-	body, err := exp.Export(records, format, resolve, indicateActive, filterInactive)
+	body, err := exp.Export(records, format, s.Config.ActivePfx, resolve, indicateActive, filterInactive)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -140,7 +145,7 @@ func servePhonebook(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, string(body))
 }
 
-func exportOnce(source, path string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
+func exportOnce(source, path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
 	for _, outTgt := range targets {
 		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
 		exp, ok := exporters[outTgt]
@@ -151,21 +156,21 @@ func exportOnce(source, path string, formats, targets []string, resolve, indicat
 		for _, outFmt := range formats {
 			switch strings.ToLower(strings.TrimSpace(outFmt)) {
 			case "d", "direct": // Direct calling phonebook.
-				body, err := exp.Export(records, exporter.FormatDirect, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records, exporter.FormatDirect, activePfx, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
-				body, err := exp.Export(records, exporter.FormatPBX, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records, exporter.FormatPBX, activePfx, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "c", "combined":
-				body, err := exp.Export(records, exporter.FormatCombined, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records, exporter.FormatCombined, activePfx, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
@@ -194,7 +199,8 @@ func runServer(cfg *configuration.Config) error {
 		}
 	}()
 
-	http.HandleFunc("/phonebook", servePhonebook)
+	srv := Server{cfg}
+	http.HandleFunc("/phonebook", srv.ServePhonebook)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		return err
@@ -206,7 +212,7 @@ func runLocal(cfg *configuration.Config) error {
 	if err := refreshRecords(cfg.Source, cfg.OLSRFile); err != nil {
 		return err
 	}
-	if err := exportOnce(cfg.Source, cfg.Path, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive); err != nil {
+	if err := exportOnce(cfg.Source, cfg.Path, cfg.ActivePfx, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive); err != nil {
 		return err
 	}
 
@@ -244,6 +250,7 @@ func main() {
 			Resolve:        *resolve,
 			IndicateActive: *indicateActive,
 			FilterInactive: *filterInactive,
+			ActivePfx:      *activePfx,
 			Port:           *port,
 			Reload:         *reload,
 		}

@@ -19,6 +19,7 @@ type Config struct {
 	Resolve        bool     `json:"resolve"`
 	IndicateActive bool     `json:"indicate_active"`
 	FilterInactive bool     `json:"filter_inactive"`
+	ActivePfx      string   `json:"active_pfx"`
 
 	// Only relevant when running in server mode.
 	Port          int `json:"port"`

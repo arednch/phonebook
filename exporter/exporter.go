@@ -8,8 +8,6 @@ import (
 )
 
 const (
-	activePfx = "[A] "
-
 	FormatCombined = Format("combined")
 	FormatDirect   = Format("direct")
 	FormatPBX      = Format("pbx")
@@ -18,10 +16,10 @@ const (
 type Format string
 
 type Exporter interface {
-	Export([]*data.Entry, Format, bool, bool, bool) ([]byte, error)
+	Export([]*data.Entry, Format, string, bool, bool, bool) ([]byte, error)
 }
 
-func export(entries []*data.Entry, format Format, resolve, indicateActive, filterInactive bool) *data.GenericPhoneBook {
+func export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive bool) *data.GenericPhoneBook {
 	var targetEntries []*data.GenericEntry
 	for _, entry := range entries {
 		if filterInactive && entry.OLSR == nil {
@@ -68,11 +66,11 @@ func export(entries []*data.Entry, format Format, resolve, indicateActive, filte
 
 type Generic struct{}
 
-func (g *Generic) Export(entries []*data.Entry, format Format, resolve, indicateActive, filterInactive bool) ([]byte, error) {
+func (g *Generic) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive bool) ([]byte, error) {
 	return xml.MarshalIndent(struct {
 		*data.GenericPhoneBook
 		XMLName struct{} `xml:"IPPhoneDirectory"`
 	}{
-		GenericPhoneBook: export(entries, format, resolve, indicateActive, filterInactive),
+		GenericPhoneBook: export(entries, format, activePfx, resolve, indicateActive, filterInactive),
 	}, "", "    ")
 }

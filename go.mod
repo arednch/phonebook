@@ -1,3 +1,3 @@
-module github.com/finfinack/phonebook
+module github.com/arednch/phonebook
 
 go 1.20

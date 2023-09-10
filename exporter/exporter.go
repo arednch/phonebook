@@ -4,7 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/finfinack/phonebook/data"
+	"github.com/arednch/phonebook/data"
 )
 
 const (

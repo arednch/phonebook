@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/finfinack/phonebook/configuration"
-	"github.com/finfinack/phonebook/data"
-	"github.com/finfinack/phonebook/exporter"
-	"github.com/finfinack/phonebook/importer"
-	"github.com/finfinack/phonebook/olsr"
+	"github.com/arednch/phonebook/configuration"
+	"github.com/arednch/phonebook/data"
+	"github.com/arednch/phonebook/exporter"
+	"github.com/arednch/phonebook/importer"
+	"github.com/arednch/phonebook/olsr"
 )
 
 var (

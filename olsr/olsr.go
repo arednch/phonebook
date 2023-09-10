@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/finfinack/phonebook/data"
+	"github.com/arednch/phonebook/data"
 )
 
 const (

@@ -56,7 +56,7 @@ The following pointers provide the necessary starting points:
 - https://openwrt.org/docs/guide-developer/toolchain/single.package
 - https://openwrt.org/docs/guide-developer/packages
 
-See https://github.com/finfinack/aredn-packages/tree/main/phonebook for the definitions we use.
+See https://github.com/arednch/packages/tree/main/phonebook for the definitions we use.
 
 ## Service
 
@@ -92,7 +92,7 @@ You could also simplify later re-deployments a bit:
 
 cd /tmp/
 rm -rf phonebook
-git clone https://github.com/finfinack/phonebook.git phonebook
+git clone https://github.com/arednch/phonebook.git phonebook
 cd phonebook
 go build .
 

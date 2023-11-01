@@ -66,6 +66,12 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 		if strings.EqualFold(r[0], eofSignal) {
 			break
 		}
+		// also skip if we encounter the first empty line
+		if strings.TrimSpace(r[0]) == "" && strings.TrimSpace(r[1]) == "" &&
+			strings.TrimSpace(r[2]) == "" && strings.TrimSpace(r[3]) == "" &&
+			strings.TrimSpace(r[4]) == "" {
+			break
+		}
 
 		records = append(records, &data.Entry{
 			FirstName:   strings.TrimSpace(r[0]),

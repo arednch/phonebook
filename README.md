@@ -15,8 +15,8 @@ Only relevant when running in **non-server / ad-hoc mode**:
 - `path`: Folder to write the phonebooks to locally. Default: ""
 - `formats`: Comma separated list of formats to export.
 
-		- Supported: combined
-		- Default: "pbx,direct,combined"
+		- Supported: pbx,direct,combined
+		- Default: "combined"
 
 - `targets`: Comma separated list of targets to export.
 

@@ -31,7 +31,7 @@ var (
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
 	formats        = flag.String("formats", "combined", "Comma separated list of formats to export. Supported: pbx,direct,combined")
 	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom")
-	resolve        = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OSLR data.")
+	resolve        = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OLSR data.")
 	indicateActive = flag.Bool("indicate_active", false, "Prefixes active participants in the phonebook with -active_pfx.")
 	filterInactive = flag.Bool("filter_inactive", false, "Filters inactive participants to not show in the phonebook.")
 	activePfx      = flag.String("active_pfx", "*", "Prefix to add when -indicate_active is set.")
@@ -59,7 +59,7 @@ func refreshRecords(source, olsrFile string) error {
 	}
 
 	if _, err := os.Stat(olsrFile); err == nil {
-		oslrData, err := olsr.Read(olsrFile)
+		olsrData, err := olsr.Read(olsrFile)
 		if err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ func refreshRecords(source, olsrFile string) error {
 				continue
 			}
 			hostname := addrParts[1]
-			o, ok := oslrData[strings.Split(hostname, ".")[0]]
+			o, ok := olsrData[strings.Split(hostname, ".")[0]]
 			if !ok {
 				continue
 			}

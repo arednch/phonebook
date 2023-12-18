@@ -23,7 +23,7 @@ Only relevant when running in **non-server / ad-hoc mode**:
 		- Supported: generic,yealink,cisco,snom
 		- Default: ""
 
-- `resolve`: Resolve hostnames to IPs when set to true using OSLR data. Default: `false`
+- `resolve`: Resolve hostnames to IPs when set to true using OLSR data. Default: `false`
 - `indicate_active`: Prefixes active participants in the phonebook with `[A]`. Default: `false`
 - `filter_inactive`: Filters inactive participants to not show in the phonebook. Default: `false`
 

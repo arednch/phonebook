@@ -7,7 +7,7 @@ Phonebook conversion from CSV to XML intended to be used for AREDN.
 Generally applicable:
 
 - `source`: Path or URL to fetch the phonebook CSV from. Default: ""
-- `olsr`: Path to the OLSR hosts file. Default: `/tmp/run/hosts_olsr.stable`
+- `olsr`: Path to the OLSR hosts file. Default: `/tmp/run/hosts_olsr`
 - `server`: Phonebook acts as a server when set to true. Default: false
 
 Only relevant when running in **non-server / ad-hoc mode**:
@@ -70,7 +70,7 @@ Description=Phonebook for AREDN.
 [Service]
 User=root
 WorkingDirectory=/tmp/
-ExecStart=/usr/bin/phonebook --server=true --port=8080 --source="<insert CSV source>" --olsr="/tmp/run/hosts_olsr.stable"
+ExecStart=/usr/bin/phonebook --server=true --port=8080 --source="<insert CSV source>" --olsr="/tmp/run/hosts_olsr"
 Restart=always
 
 [Install]
@@ -114,7 +114,7 @@ A typical file would look like this:
 ```
 {
 	"source": "http://aredn-node.local.mesh:8080/phonebook.csv",
-	"olsr_file": "/tmp/run/hosts_olsr.stable",
+	"olsr_file": "/tmp/run/hosts_olsr",
 	"server": false,
   "path": "/www",
 	"formats": [

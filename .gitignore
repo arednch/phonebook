@@ -6,6 +6,7 @@
 phonebook
 phonebook.csv
 config
+hosts_olsr
 hosts_olsr.stable
 
 ### Go ###

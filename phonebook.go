@@ -24,7 +24,7 @@ var (
 	// Generally applicable flags.
 	conf     = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
 	source   = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
-	olsrFile = flag.String("olsr", "/tmp/run/hosts_olsr.stable", "Path to the OLSR hosts file.")
+	olsrFile = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
 	server   = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.

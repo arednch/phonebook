@@ -30,7 +30,7 @@ var (
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
 	formats        = flag.String("formats", "combined", "Comma separated list of formats to export. Supported: pbx,direct,combined")
-	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom")
+	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom,grandstream")
 	resolve        = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OLSR data.")
 	indicateActive = flag.Bool("indicate_active", false, "Prefixes active participants in the phonebook with -active_pfx.")
 	filterInactive = flag.Bool("filter_inactive", false, "Filters inactive participants to not show in the phonebook.")
@@ -109,7 +109,7 @@ func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 
 	target := r.FormValue("target")
 	if target == "" {
-		http.Error(w, "'target' must be specified: [generic,cisco,snom,yealink]", http.StatusBadRequest)
+		http.Error(w, "'target' must be specified: [generic,cisco,snom,yealink,grandstream]", http.StatusBadRequest)
 		return
 	}
 	outTgt := strings.ToLower(strings.TrimSpace(target))
@@ -145,7 +145,7 @@ func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, string(body))
 }
 
-func exportOnce(source, path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
+func exportOnce(path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
 	for _, outTgt := range targets {
 		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
 		exp, ok := exporters[outTgt]
@@ -212,7 +212,7 @@ func runLocal(cfg *configuration.Config) error {
 	if err := refreshRecords(cfg.Source, cfg.OLSRFile); err != nil {
 		return err
 	}
-	if err := exportOnce(cfg.Source, cfg.Path, cfg.ActivePfx, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive); err != nil {
+	if err := exportOnce(cfg.Path, cfg.ActivePfx, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive); err != nil {
 		return err
 	}
 
@@ -224,10 +224,11 @@ func main() {
 	flag.Parse()
 	recordsMu = &sync.RWMutex{}
 	exporters = map[string]exporter.Exporter{
-		"generic": &exporter.Generic{},
-		"cisco":   &exporter.Cisco{},
-		"yealink": &exporter.Yealink{},
-		"snom":    &exporter.Snom{},
+		"generic":     &exporter.Generic{},
+		"cisco":       &exporter.Cisco{},
+		"yealink":     &exporter.Yealink{},
+		"snom":        &exporter.Snom{},
+		"grandstream": &exporter.Grandstream{},
 	}
 
 	var cfg *configuration.Config

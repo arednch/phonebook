@@ -8,9 +8,10 @@ import (
 
 type Config struct {
 	// Generally applicable.
-	Source   string `json:"source"`
-	OLSRFile string `json:"olsr_file"`
-	Server   bool   `json:"server"`
+	Source     string `json:"source"`
+	OLSRFile   string `json:"olsr_file"`
+	SysInfoURL string `json:"sysinfo_url"`
+	Server     bool   `json:"server"`
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	Path           string   `json:"path"`

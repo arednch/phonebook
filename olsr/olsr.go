@@ -3,6 +3,7 @@ package olsr
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"regexp"
 	"strings"
 
@@ -16,8 +17,9 @@ const (
 )
 
 var (
-	hostsRE  = regexp.MustCompile(`([0-9\.]+)\s+(\S+)\s?#\s*(.*)`)
-	phonesRE = regexp.MustCompile(`([0-9\.]+)\s+([0-9]+)\s?#\s*(.*)`)
+	hostsRE         = regexp.MustCompile(`([0-9\.]+)\s+(\S+)\s?#\s*(.*)`)
+	phonesRE        = regexp.MustCompile(`([0-9\.]+)\s+([0-9]+)\s?#\s*(.*)`)
+	phoneHostnameRE = regexp.MustCompile(`^[0-9]+$`)
 )
 
 func ReadFromURL(url string) (map[string]*data.OLSR, error) {
@@ -26,7 +28,25 @@ func ReadFromURL(url string) (map[string]*data.OLSR, error) {
 		return nil, err
 	}
 
-	return Read(b)
+	var sysinfo data.SysInfo
+	if err := json.Unmarshal(b, &sysinfo); err != nil {
+		return nil, err
+	}
+
+	d := map[string]*data.OLSR{}
+	for _, host := range sysinfo.Hosts {
+		if filterNonPhones && !phoneHostnameRE.MatchString(host.Name) {
+			continue
+		}
+
+		o := &data.OLSR{
+			IP:       host.IP,
+			Hostname: host.Name,
+		}
+		d[host.Name] = o
+	}
+
+	return d, nil
 }
 
 func ReadFromFile(path string) (map[string]*data.OLSR, error) {
@@ -35,10 +55,6 @@ func ReadFromFile(path string) (map[string]*data.OLSR, error) {
 		return nil, err
 	}
 
-	return Read(b)
-}
-
-func Read(b []byte) (map[string]*data.OLSR, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(b))
 	scanner.Split(bufio.ScanLines)
 
@@ -71,7 +87,7 @@ func Read(b []byte) (map[string]*data.OLSR, error) {
 		if len(parts) > 3 {
 			o.Comment = parts[3]
 		}
-		d[parts[2]] = o
+		d[o.Hostname] = o
 	}
 
 	return d, nil

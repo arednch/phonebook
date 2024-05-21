@@ -22,10 +22,11 @@ import (
 
 var (
 	// Generally applicable flags.
-	conf     = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
-	source   = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
-	olsrFile = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
-	server   = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
+	conf       = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
+	source     = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
+	olsrFile   = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
+	sysInfoURL = flag.String("sysinfo", "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1", "URL of sysinfo JSON API.")
+	server     = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
@@ -52,29 +53,46 @@ var (
 	exporters map[string]exporter.Exporter
 )
 
-func refreshRecords(source, olsrFile string) error {
+func refreshRecords(source, olsrFile, sysInfoURL string) error {
 	rec, err := importer.ReadPhonebook(source)
 	if err != nil {
 		return err
 	}
 
-	if _, err := os.Stat(olsrFile); err == nil {
-		olsrData, err := olsr.ReadFromFile(olsrFile)
+	var hostData map[string]*data.OLSR
+	switch {
+	case olsrFile == "" && sysInfoURL == "":
+		fmt.Println("not reading network information: neither OLSR file nor sysinfo URL specified")
+		return nil
+
+	case sysInfoURL != "":
+		hostData, err = olsr.ReadFromURL(sysInfoURL)
 		if err != nil {
 			return err
 		}
-		for _, e := range rec {
-			addrParts := strings.Split(e.IPAddress, sipSeparator)
-			if len(addrParts) != 2 {
-				continue
-			}
-			hostname := addrParts[1]
-			o, ok := olsrData[strings.Split(hostname, ".")[0]]
-			if !ok {
-				continue
-			}
-			e.OLSR = o
+
+	case olsrFile != "":
+		if _, err := os.Stat(olsrFile); err != nil {
+			fmt.Printf("not reading network information: OLSR file %q does not exist\n", olsrFile)
+			return nil
 		}
+		hostData, err = olsr.ReadFromFile(olsrFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, e := range rec {
+		addrParts := strings.Split(e.IPAddress, sipSeparator)
+		if len(addrParts) != 2 {
+			continue
+		}
+		hostname := addrParts[1]
+		o, ok := hostData[strings.Split(hostname, ".")[0]]
+		if !ok {
+			continue
+		}
+		e.OLSR = o
 	}
 
 	recordsMu.Lock()
@@ -192,7 +210,7 @@ func runServer(cfg *configuration.Config) error {
 
 	go func() {
 		for {
-			if err := refreshRecords(cfg.Source, cfg.OLSRFile); err != nil {
+			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
 				fmt.Printf("error refreshing data from upstream: %s\n", err)
 			}
 			time.Sleep(cfg.Reload)
@@ -209,7 +227,7 @@ func runServer(cfg *configuration.Config) error {
 }
 
 func runLocal(cfg *configuration.Config) error {
-	if err := refreshRecords(cfg.Source, cfg.OLSRFile); err != nil {
+	if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
 		return err
 	}
 	if err := exportOnce(cfg.Path, cfg.ActivePfx, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive); err != nil {
@@ -244,6 +262,7 @@ func main() {
 		cfg = &configuration.Config{
 			Source:         *source,
 			OLSRFile:       *olsrFile,
+			SysInfoURL:     *sysInfoURL,
 			Server:         *server,
 			Path:           *path,
 			Formats:        strings.Split(*formats, ","),

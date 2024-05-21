@@ -8,6 +8,7 @@ Generally applicable:
 
 - `source`: Path or URL to fetch the phonebook CSV from. Default: ""
 - `olsr`: Path to the OLSR hosts file. Default: `/tmp/run/hosts_olsr`
+- `sysinfo`: URL from which to fetch AREDN sysinfo. Usually: `http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1`
 - `server`: Phonebook acts as a server when set to true. Default: false
 
 Only relevant when running in **non-server / ad-hoc mode**:
@@ -20,7 +21,7 @@ Only relevant when running in **non-server / ad-hoc mode**:
 
 - `targets`: Comma separated list of targets to export.
 
-		- Supported: generic,yealink,cisco,snom
+		- Supported: generic,yealink,cisco,snom,grandstream
 		- Default: ""
 
 - `resolve`: Resolve hostnames to IPs when set to true using OLSR data. Default: `false`
@@ -70,7 +71,7 @@ Description=Phonebook for AREDN.
 [Service]
 User=root
 WorkingDirectory=/tmp/
-ExecStart=/usr/bin/phonebook --server=true --port=8080 --source="<insert CSV source>" --olsr="/tmp/run/hosts_olsr"
+ExecStart=/usr/bin/phonebook --server=true --port=8080 --source="<insert CSV source>" --olsr="/tmp/run/hosts_olsr" --sysinfo="http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1"
 Restart=always
 
 [Install]
@@ -115,6 +116,7 @@ A typical file would look like this:
 {
 	"source": "http://aredn-node.local.mesh:8080/phonebook.csv",
 	"olsr_file": "/tmp/run/hosts_olsr",
+	"sysinfo": "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1",
 	"server": false,
   "path": "/www",
 	"formats": [

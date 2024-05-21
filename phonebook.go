@@ -25,7 +25,7 @@ var (
 	conf       = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
 	source     = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
 	olsrFile   = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
-	sysInfoURL = flag.String("sysinfo", "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1", "URL of sysinfo JSON API.")
+	sysInfoURL = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
 	server     = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.

@@ -2,11 +2,12 @@ package olsr
 
 import (
 	"bufio"
-	"os"
+	"bytes"
 	"regexp"
 	"strings"
 
 	"github.com/arednch/phonebook/data"
+	"github.com/arednch/phonebook/importer"
 )
 
 const (
@@ -19,13 +20,26 @@ var (
 	phonesRE = regexp.MustCompile(`([0-9\.]+)\s+([0-9]+)\s?#\s*(.*)`)
 )
 
-func Read(path string) (map[string]*data.OLSR, error) {
-	f, err := os.Open(path)
+func ReadFromURL(url string) (map[string]*data.OLSR, error) {
+	b, err := importer.ReadFromURL(url)
 	if err != nil {
 		return nil, err
 	}
 
-	scanner := bufio.NewScanner(f)
+	return Read(b)
+}
+
+func ReadFromFile(path string) (map[string]*data.OLSR, error) {
+	b, err := importer.ReadFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return Read(b)
+}
+
+func Read(b []byte) (map[string]*data.OLSR, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(b))
 	scanner.Split(bufio.ScanLines)
 
 	d := map[string]*data.OLSR{}
@@ -59,7 +73,6 @@ func Read(path string) (map[string]*data.OLSR, error) {
 		}
 		d[parts[2]] = o
 	}
-	f.Close()
 
 	return d, nil
 }

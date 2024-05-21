@@ -59,7 +59,7 @@ func refreshRecords(source, olsrFile string) error {
 	}
 
 	if _, err := os.Stat(olsrFile); err == nil {
-		olsrData, err := olsr.Read(olsrFile)
+		olsrData, err := olsr.ReadFromFile(olsrFile)
 		if err != nil {
 			return err
 		}

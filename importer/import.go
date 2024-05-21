@@ -15,7 +15,7 @@ const (
 	eofSignal = "ENDOFFILE"
 )
 
-func readFromURL(url string) ([]byte, error) {
+func ReadFromURL(url string) ([]byte, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -25,7 +25,7 @@ func readFromURL(url string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func readFromFile(path string) ([]byte, error) {
+func ReadFromFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
@@ -36,9 +36,9 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 	case strings.HasPrefix(path, "http://"):
 		fallthrough
 	case strings.HasPrefix(path, "https://"):
-		blob, err = readFromURL(path)
+		blob, err = ReadFromURL(path)
 	default:
-		blob, err = readFromFile(path)
+		blob, err = ReadFromFile(path)
 	}
 	if err != nil {
 		return nil, err

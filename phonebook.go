@@ -12,10 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mark-rushakoff/ldapserver"
+
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
 	"github.com/arednch/phonebook/exporter"
 	"github.com/arednch/phonebook/importer"
+	"github.com/arednch/phonebook/ldap"
 	"github.com/arednch/phonebook/olsr"
 	"github.com/arednch/phonebook/server"
 )
@@ -27,6 +30,7 @@ var (
 	olsrFile   = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
 	sysInfoURL = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
 	daemonize  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
+	ldapServer = flag.Bool("ldap_server", false, "Phonebook also runs an LDAP server when in server mode.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
@@ -38,8 +42,11 @@ var (
 	activePfx      = flag.String("active_pfx", "*", "Prefix to add when -indicate_active is set.")
 
 	// Only relevant when running in server mode.
-	port   = flag.Int("port", 8080, "Port to listen on (when running as a server).")
-	reload = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
+	port     = flag.Int("port", 8080, "Port to listen on (when running as a server).")
+	reload   = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
+	ldapPort = flag.Int("ldap_port", 3890, "Port to listen on for the LDAP server (when running as a server AND LDAP server is on as well).")
+	ldapUser = flag.String("ldap_user", "aredn", "Username to provide to connect to the LDAP server.")
+	ldapPwd  = flag.String("ldap_pwd", "aredn", "Password to provide to connect to the LDAP server.")
 )
 
 const (
@@ -146,6 +153,22 @@ func runServer(cfg *configuration.Config) error {
 		return errors.New("source needs to be set")
 	}
 
+	if cfg.LDAPServer {
+		ldapSrv := &ldap.Server{
+			Config:  cfg,
+			Records: records,
+		}
+		s := ldapserver.NewServer()
+		s.Bind = ldapSrv.Bind
+		s.Search = ldapSrv.Search
+
+		go func() {
+			if err := s.ListenAndServe(fmt.Sprintf(":%d", cfg.LDAPPort)); err != nil {
+				fmt.Printf("LDAP server failed: %s", err)
+			}
+		}()
+	}
+
 	go func() {
 		for {
 			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
@@ -209,6 +232,7 @@ func main() {
 			OLSRFile:       *olsrFile,
 			SysInfoURL:     *sysInfoURL,
 			Server:         *daemonize,
+			LDAPServer:     *ldapServer,
 			Path:           *path,
 			Formats:        strings.Split(*formats, ","),
 			Targets:        strings.Split(*targets, ","),
@@ -218,6 +242,9 @@ func main() {
 			ActivePfx:      *activePfx,
 			Port:           *port,
 			Reload:         *reload,
+			LDAPPort:       *ldapPort,
+			LDAPUser:       *ldapUser,
+			LDAPPwd:        *ldapPwd,
 		}
 	}
 

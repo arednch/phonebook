@@ -10,6 +10,7 @@ Generally applicable:
 - `olsr`: Path to the OLSR hosts file. Default: `/tmp/run/hosts_olsr`
 - `sysinfo`: URL from which to fetch AREDN sysinfo. Usually: `http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1`
 - `server`: Phonebook acts as a server when set to true. Default: false
+- `ldap_server`: When the phonebook is running as a server, it also exposes an LDAP v3 server when set to true. Default: false
 
 Only relevant when running in **non-server / ad-hoc mode**:
 
@@ -33,6 +34,12 @@ Only relevant when running in **server mode**:
 - `port`: Port to listen on (when running as a server). Default: `8080`
 - `reload`: Duration after which to try to reload the phonebook source. Default: `1h`
 - `conf`: Config file to read settings from instead of parsing flags. Default: ""
+
+Only relevant when running in **server mode** AND **LDAP server** is active:
+
+- `ldap_port`: Port to listen on for the LDAP server (when running as a server AND LDAP server is on as well). Default: `3890`
+- `ldap_user`: Username to provide to connect to the LDAP server. Default: `aredn`
+- `ldap_pwd`: Password to provide to connect to the LDAP server. Default: `aredn`
 
 ## Examples
 

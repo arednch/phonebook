@@ -12,6 +12,7 @@ type Config struct {
 	OLSRFile   string `json:"olsr_file"`
 	SysInfoURL string `json:"sysinfo_url"`
 	Server     bool   `json:"server"`
+	LDAPServer bool   `json:"ldap_server"`
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	Path           string   `json:"path"`
@@ -26,6 +27,10 @@ type Config struct {
 	Port          int `json:"port"`
 	ReloadSeconds int `json:"reload_seconds"`
 	Reload        time.Duration
+	// Only relevant when LDAP server is on.
+	LDAPPort int    `json:"ldap_port"`
+	LDAPUser string `json:"ldap_user"`
+	LDAPPwd  string `json:"ldap_pwd"`
 }
 
 func Read(path string) (*Config, error) {

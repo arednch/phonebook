@@ -146,14 +146,14 @@ func runServer(cfg *configuration.Config) error {
 		return errors.New("source needs to be set")
 	}
 
-	// go func() {
-	// 	for {
-	// 		if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
-	// 			fmt.Printf("error refreshing data from upstream: %s\n", err)
-	// 		}
-	// 		time.Sleep(cfg.Reload)
-	// 	}
-	// }()
+	go func() {
+		for {
+			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
+				fmt.Printf("error refreshing data from upstream: %s\n", err)
+			}
+			time.Sleep(cfg.Reload)
+		}
+	}()
 
 	srv := &server.Server{
 		Config:    cfg,
@@ -165,15 +165,6 @@ func runServer(cfg *configuration.Config) error {
 	if err != nil {
 		return err
 	}
-
-	go func() {
-		for {
-			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
-				fmt.Printf("error refreshing data from upstream: %s\n", err)
-			}
-			time.Sleep(cfg.Reload)
-		}
-	}()
 
 	return http.Serve(listener, nil)
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/arednch/phonebook/exporter"
 	"github.com/arednch/phonebook/importer"
 	"github.com/arednch/phonebook/olsr"
+	"github.com/arednch/phonebook/server"
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 	source     = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
 	olsrFile   = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
 	sysInfoURL = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
-	server     = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
+	daemonize  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
@@ -47,8 +47,7 @@ const (
 )
 
 var (
-	recordsMu *sync.RWMutex
-	records   []*data.Entry
+	records *data.Records
 
 	exporters map[string]exporter.Exporter
 )
@@ -95,72 +94,11 @@ func refreshRecords(source, olsrFile, sysInfoURL string) error {
 		e.OLSR = o
 	}
 
-	recordsMu.Lock()
-	defer recordsMu.Unlock()
-	records = rec
+	records.Mu.Lock()
+	defer records.Mu.Unlock()
+	records.Entries = rec
 
 	return nil
-}
-
-type Server struct {
-	Config *configuration.Config
-}
-
-func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
-	f := r.FormValue("format")
-	if f == "" {
-		http.Error(w, "'format' must be specified: [direct,pbx,combined]", http.StatusBadRequest)
-		return
-	}
-	var format exporter.Format
-	switch strings.ToLower(strings.TrimSpace(f)) {
-	case "d", "direct":
-		format = exporter.FormatDirect
-	case "p", "pbx":
-		format = exporter.FormatPBX
-	case "c", "combined":
-		format = exporter.FormatCombined
-	default:
-		http.Error(w, "'format' must be specified: [direct,pbx,combined]", http.StatusBadRequest)
-		return
-	}
-
-	target := r.FormValue("target")
-	if target == "" {
-		http.Error(w, "'target' must be specified: [generic,cisco,snom,yealink,grandstream]", http.StatusBadRequest)
-		return
-	}
-	outTgt := strings.ToLower(strings.TrimSpace(target))
-	exp, ok := exporters[outTgt]
-	if !ok {
-		http.Error(w, "Unknown target.", http.StatusBadRequest)
-		return
-	}
-
-	var resolve bool
-	res := r.FormValue("resolve")
-	if strings.ToLower(strings.TrimSpace(res)) == "true" {
-		resolve = true
-	}
-
-	var indicateActive bool
-	ia := r.FormValue("ia")
-	if strings.ToLower(strings.TrimSpace(ia)) == "true" {
-		indicateActive = true
-	}
-
-	var filterInactive bool
-	fi := r.FormValue("fi")
-	if strings.ToLower(strings.TrimSpace(fi)) == "true" {
-		filterInactive = true
-	}
-
-	body, err := exp.Export(records, format, s.Config.ActivePfx, resolve, indicateActive, filterInactive)
-	if err != nil {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	io.WriteString(w, string(body))
 }
 
 func exportOnce(path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
@@ -174,21 +112,21 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 		for _, outFmt := range formats {
 			switch strings.ToLower(strings.TrimSpace(outFmt)) {
 			case "d", "direct": // Direct calling phonebook.
-				body, err := exp.Export(records, exporter.FormatDirect, activePfx, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records.Entries, exporter.FormatDirect, activePfx, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
-				body, err := exp.Export(records, exporter.FormatPBX, activePfx, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records.Entries, exporter.FormatPBX, activePfx, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "c", "combined":
-				body, err := exp.Export(records, exporter.FormatCombined, activePfx, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records.Entries, exporter.FormatCombined, activePfx, resolve, indicateActive, filterInactive)
 				if err != nil {
 					return err
 				}
@@ -208,6 +146,26 @@ func runServer(cfg *configuration.Config) error {
 		return errors.New("source needs to be set")
 	}
 
+	// go func() {
+	// 	for {
+	// 		if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
+	// 			fmt.Printf("error refreshing data from upstream: %s\n", err)
+	// 		}
+	// 		time.Sleep(cfg.Reload)
+	// 	}
+	// }()
+
+	srv := &server.Server{
+		Config:    cfg,
+		Records:   records,
+		Exporters: exporters,
+	}
+	http.HandleFunc("/phonebook", srv.ServePhonebook)
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
+	if err != nil {
+		return err
+	}
+
 	go func() {
 		for {
 			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
@@ -217,12 +175,6 @@ func runServer(cfg *configuration.Config) error {
 		}
 	}()
 
-	srv := Server{cfg}
-	http.HandleFunc("/phonebook", srv.ServePhonebook)
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
-	if err != nil {
-		return err
-	}
 	return http.Serve(listener, nil)
 }
 
@@ -240,7 +192,9 @@ func runLocal(cfg *configuration.Config) error {
 func main() {
 	// Parse flags globally.
 	flag.Parse()
-	recordsMu = &sync.RWMutex{}
+	records = &data.Records{
+		Mu: &sync.RWMutex{},
+	}
 	exporters = map[string]exporter.Exporter{
 		"generic":     &exporter.Generic{},
 		"cisco":       &exporter.Cisco{},
@@ -263,7 +217,7 @@ func main() {
 			Source:         *source,
 			OLSRFile:       *olsrFile,
 			SysInfoURL:     *sysInfoURL,
-			Server:         *server,
+			Server:         *daemonize,
 			Path:           *path,
 			Formats:        strings.Split(*formats, ","),
 			Targets:        strings.Split(*targets, ","),

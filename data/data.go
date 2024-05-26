@@ -1,6 +1,13 @@
 package data
 
+import "sync"
+
 // Source
+
+type Records struct {
+	Mu      *sync.RWMutex
+	Entries []*Entry
+}
 
 type Entry struct {
 	FirstName   string

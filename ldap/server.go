@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	filterRE = regexp.MustCompile(`\(cn=([a-zA-Z0-9]+)\*\)`)
+	filterRE = regexp.MustCompile(`\(\w*=\*?([a-zA-Z0-9]+)\*?\)`)
 )
 
 type Server struct {
@@ -30,6 +30,11 @@ func (s *Server) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldapserver.LD
 }
 
 func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn net.Conn) (ldapserver.ServerSearchResult, error) {
+	var parts []string
+	if searchReq.Filter != "" {
+		parts = filterRE.FindStringSubmatch(searchReq.Filter)
+	}
+
 	entries := []*ldapserver.Entry{}
 	for _, entry := range s.Records.Entries {
 		if s.Config.FilterInactive && entry.OLSR == nil {
@@ -54,38 +59,37 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 			name = fmt.Sprintf("%s%s, %s (%s)", pfx, entry.LastName, entry.FirstName, entry.Callsign)
 		}
 
-		if searchReq.Filter != "" {
-			parts := filterRE.FindStringSubmatch(searchReq.Filter)
-			if len(parts) > 1 {
-				if !strings.Contains(strings.ToLower(name), strings.ToLower(parts[1])) {
-					continue
-				}
-			}
+		if searchReq.Filter != "" && len(parts) > 1 && !strings.Contains(strings.ToLower(name), strings.ToLower(parts[1])) {
+			continue
 		}
 
 		attrs := []*ldapserver.EntryAttribute{
+			{Name: "objectClass", Values: []string{"person"}},
+			{Name: "displayName", Values: []string{name}},
 			{Name: "cn", Values: []string{name}},
-			{Name: "displayname", Values: []string{name}},
 			{Name: "firstname", Values: []string{entry.FirstName}},
+			{Name: "gn", Values: []string{entry.FirstName}},
 			{Name: "lastname", Values: []string{entry.LastName}},
+			{Name: "sn", Values: []string{entry.LastName}},
 			{Name: "callsign", Values: []string{entry.Callsign}},
 
-			{Name: "phoneNumber", Values: []string{entry.PhoneNumber}},
-			{Name: "phoneHostname", Values: []string{entry.IPAddress}},
+			{Name: "telephoneNumber", Values: []string{entry.PhoneNumber}},
+			{Name: "telephoneHostname", Values: []string{entry.IPAddress}},
 		}
 
 		if entry.OLSR != nil {
 			attrs = append(attrs, []*ldapserver.EntryAttribute{
-				{Name: "phoneIP", Values: []string{entry.OLSR.IP}},
+				{Name: "telephoneIP", Values: []string{entry.OLSR.IP}},
 			}...)
 		}
 
 		entries = append(entries, &ldapserver.Entry{
-			DN:         fmt.Sprintf("cn=%s,", name) + searchReq.BaseDN,
+			DN:         fmt.Sprintf("cn=%s,dc=aredn,%s", name, searchReq.BaseDN),
 			Attributes: attrs,
 		})
 	}
 
+	fmt.Println(len(entries))
 	return ldapserver.ServerSearchResult{
 		Entries:    entries,
 		Referrals:  []string{},

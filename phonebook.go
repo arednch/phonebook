@@ -35,7 +35,7 @@ var (
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
 	formats        = flag.String("formats", "combined", "Comma separated list of formats to export. Supported: pbx,direct,combined")
-	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom,grandstream")
+	targets        = flag.String("targets", "", "Comma separated list of targets to export. Supported: generic,yealink,cisco,snom,grandstream,vcard")
 	resolve        = flag.Bool("resolve", false, "Resolve hostnames to IPs when set to true using OLSR data.")
 	indicateActive = flag.Bool("indicate_active", false, "Prefixes active participants in the phonebook with -active_pfx.")
 	filterInactive = flag.Bool("filter_inactive", false, "Filters inactive participants to not show in the phonebook.")
@@ -215,6 +215,7 @@ func main() {
 		"yealink":     &exporter.Yealink{},
 		"snom":        &exporter.Snom{},
 		"grandstream": &exporter.Grandstream{},
+		"vcard":       &exporter.VCard{},
 	}
 
 	var cfg *configuration.Config

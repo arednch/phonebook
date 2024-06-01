@@ -22,7 +22,7 @@ Only relevant when running in **non-server / ad-hoc mode**:
 
 - `targets`: Comma separated list of targets to export.
 
-		- Supported: generic,yealink,cisco,snom,grandstream
+		- Supported: generic,yealink,cisco,snom,grandstream,vcard
 		- Default: ""
 
 - `resolve`: Resolve hostnames to IPs when set to true using OLSR data. Default: `false`

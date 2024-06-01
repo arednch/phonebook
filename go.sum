@@ -1,2 +1,4 @@
+github.com/emersion/go-vcard v0.0.0-20230815062825-8fda7d206ec9 h1:ATgqloALX6cHCranzkLb8/zjivwQ9DWWDCQRnxTPfaA=
+github.com/emersion/go-vcard v0.0.0-20230815062825-8fda7d206ec9/go.mod h1:HMJKR5wlh/ziNp+sHEDV2ltblO4JD2+IdDOWtGcQBTM=
 github.com/mark-rushakoff/ldapserver v0.3.0 h1:xodND0vXac5zs4Q0Y37J6KCzIU+uHjl/DMuvbG/x+0Q=
 github.com/mark-rushakoff/ldapserver v0.3.0/go.mod h1:J2CbQSDmyEFCNwPuNYfqSvzgwRT9ZgweANnPs3KSMw4=

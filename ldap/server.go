@@ -56,17 +56,40 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 		case entry.FirstName == "":
 			name = fmt.Sprintf("%s%s (%s)", pfx, entry.LastName, entry.Callsign)
 		default:
-			name = fmt.Sprintf("%s%s, %s (%s)", pfx, entry.LastName, entry.FirstName, entry.Callsign)
+			name = fmt.Sprintf("%s%s %s (%s)", pfx, entry.LastName, entry.FirstName, entry.Callsign)
 		}
 
+		// provide a super simple way to filter entries
 		if searchReq.Filter != "" && len(parts) > 1 && !strings.Contains(strings.ToLower(name), strings.ToLower(parts[1])) {
 			continue
 		}
 
+		var telAttrs []string
+		for _, frmt := range s.Config.Formats {
+			switch frmt {
+			case "direct":
+				if s.Config.Resolve && entry.OLSR != nil {
+					telAttrs = append(telAttrs, entry.OLSR.IP)
+				} else {
+					telAttrs = append(telAttrs, entry.IPAddress)
+				}
+			case "pbx":
+				telAttrs = append(telAttrs, entry.PhoneNumber)
+			default:
+				if s.Config.Resolve && entry.OLSR != nil {
+					telAttrs = append(telAttrs, entry.OLSR.IP, entry.PhoneNumber)
+				} else {
+					telAttrs = append(telAttrs, entry.IPAddress, entry.PhoneNumber)
+				}
+			}
+		}
+
 		attrs := []*ldapserver.EntryAttribute{
 			{Name: "objectClass", Values: []string{"person"}},
+
 			{Name: "displayName", Values: []string{name}},
 			{Name: "cn", Values: []string{name}},
+			{Name: "meshName", Values: []string{name}},
 			{Name: "firstname", Values: []string{entry.FirstName}},
 			{Name: "gn", Values: []string{entry.FirstName}},
 			{Name: "lastname", Values: []string{entry.LastName}},
@@ -76,20 +99,26 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 			{Name: "telephoneNumber", Values: []string{entry.PhoneNumber}},
 			{Name: "telephoneHostname", Values: []string{entry.IPAddress}},
 		}
-
 		if entry.OLSR != nil {
+			attrs = append(attrs, &ldapserver.EntryAttribute{Name: "telephoneIP", Values: []string{entry.OLSR.IP}})
+		}
+
+		// Populate Linphone default as a single address.
+		for _, tel := range telAttrs {
 			attrs = append(attrs, []*ldapserver.EntryAttribute{
-				{Name: "telephoneIP", Values: []string{entry.OLSR.IP}},
+				{Name: "sipPhone", Values: []string{tel}},
 			}...)
 		}
 
 		entries = append(entries, &ldapserver.Entry{
-			DN:         fmt.Sprintf("cn=%s,dc=aredn,%s", name, searchReq.BaseDN),
+			DN:         fmt.Sprintf("sn=%s,%s", name, searchReq.BaseDN),
 			Attributes: attrs,
 		})
+		// limit search results to first X hits
+		if searchReq.SizeLimit > 0 && len(entries) >= searchReq.SizeLimit {
+			break
+		}
 	}
-
-	fmt.Println(len(entries))
 	return ldapserver.ServerSearchResult{
 		Entries:    entries,
 		Referrals:  []string{},

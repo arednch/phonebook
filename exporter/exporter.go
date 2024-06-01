@@ -13,6 +13,50 @@ const (
 	FormatPBX      = Format("pbx")
 )
 
+func NameForEntry(entry *data.Entry, indicateActive bool, activePfx string) string {
+	var pfx string
+	if indicateActive && entry.OLSR != nil {
+		pfx = activePfx
+	}
+	switch {
+	case entry.LastName == "" && entry.FirstName == "" && entry.Callsign == "":
+		return ""
+	case entry.LastName == "" && entry.FirstName == "":
+		return fmt.Sprintf("%s%s", pfx, entry.Callsign)
+	case entry.LastName == "":
+		return fmt.Sprintf("%s%s (%s)", pfx, entry.FirstName, entry.Callsign)
+	case entry.FirstName == "":
+		return fmt.Sprintf("%s%s (%s)", pfx, entry.LastName, entry.Callsign)
+	default:
+		return fmt.Sprintf("%s%s, %s (%s)", pfx, entry.LastName, entry.FirstName, entry.Callsign)
+	}
+}
+
+func TelefoneForEntry(entry *data.Entry, resolve bool, format Format) []string {
+	switch format {
+	case "direct":
+		if resolve && entry.OLSR != nil {
+			return []string{entry.OLSR.IP}
+		} else {
+			return []string{entry.IPAddress}
+		}
+	case "pbx":
+		return []string{entry.PhoneNumber}
+	default:
+		if resolve && entry.OLSR != nil {
+			return []string{
+				entry.OLSR.IP,
+				entry.PhoneNumber,
+			}
+		} else {
+			return []string{
+				entry.IPAddress,
+				entry.PhoneNumber,
+			}
+		}
+	}
+}
+
 type Format string
 
 type Exporter interface {
@@ -26,50 +70,13 @@ func export(entries []*data.Entry, format Format, activePfx string, resolve, ind
 			continue // ignoring inactive entry (no OLSR data)
 		}
 
-		var pfx string
-		if indicateActive && entry.OLSR != nil {
-			pfx = activePfx
-		}
-		var name string
-		switch {
-		case entry.LastName == "" && entry.FirstName == "" && entry.Callsign == "":
-			continue // there's no point in adding an empty contact
-		case entry.LastName == "" && entry.FirstName == "":
-			name = fmt.Sprintf("%s%s", pfx, entry.Callsign)
-		case entry.LastName == "":
-			name = fmt.Sprintf("%s%s (%s)", pfx, entry.FirstName, entry.Callsign)
-		case entry.FirstName == "":
-			name = fmt.Sprintf("%s%s (%s)", pfx, entry.LastName, entry.Callsign)
-		default:
-			name = fmt.Sprintf("%s%s, %s (%s)", pfx, entry.LastName, entry.FirstName, entry.Callsign)
-		}
-
-		var tel []string
-		switch format {
-		case "direct":
-			if resolve && entry.OLSR != nil {
-				tel = []string{entry.OLSR.IP}
-			} else {
-				tel = []string{entry.IPAddress}
-			}
-		case "pbx":
-			tel = []string{entry.PhoneNumber}
-		default:
-			if resolve && entry.OLSR != nil {
-				tel = []string{
-					entry.OLSR.IP,
-					entry.PhoneNumber,
-				}
-			} else {
-				tel = []string{
-					entry.IPAddress,
-					entry.PhoneNumber,
-				}
-			}
+		name := NameForEntry(entry, indicateActive, activePfx)
+		if name == "" {
+			continue // ignore empty contacts
 		}
 		targetEntries = append(targetEntries, &data.GenericEntry{
 			Name:      name,
-			Telephone: tel,
+			Telephone: TelefoneForEntry(entry, resolve, format),
 		})
 	}
 

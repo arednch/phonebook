@@ -26,14 +26,3 @@ func (c *Cisco) Export(entries []*data.Entry, format Format, activePfx string, r
 		},
 	}, "", "    ")
 }
-
-/*
-<CiscoIPPhoneDirectory>
-  <Title>Cisco Coporate Directory</Title>
-  <Prompt>Select the User</Prompt>
-  <DirectoryEntry>
-    <Name>HB9HFM Yealink</Name>
-    <Telephone>178230@178230.local.mesh</Telephone>
-  </DirectoryEntry>
-</CiscoIPPhoneDirectory>
-*/

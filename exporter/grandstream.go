@@ -55,7 +55,6 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 			firstname = fmt.Sprintf("%s%s (%s)", pfx, entry.FirstName, entry.Callsign)
 			lastname = entry.LastName
 		}
-		fmt.Println(firstname, lastname)
 
 		var tel []*GrandstreamPhone
 		switch format {
@@ -113,16 +112,3 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 		GrandstreamPhonebook: &GrandstreamPhonebook{Entry: targetEntries},
 	}, "", "    ")
 }
-
-/*
-<AddressBook>
-	<Contact>
-		<FirstName>John</FirstName>
-		<LastName>Doe</LastName>
-		<Phone type="Other">
-			<phonenumber>178230@178230.local.mesh</phonenumber>
-			<accountindex>0</accountindex>
-		</Phone>
-	</Contact>
-</AddressBook>
-*/

@@ -29,10 +29,13 @@ type GrandstreamPhone struct {
 
 type Grandstream struct{}
 
-func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive bool) ([]byte, error) {
+func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) ([]byte, error) {
 	var targetEntries []*GrandstreamEntry
 	for _, entry := range entries {
 		if filterInactive && entry.OLSR == nil {
+			if debug {
+				fmt.Printf("Export/Grandstream: Filtering inactive entry %+v\n", entry)
+			}
 			continue // ignoring inactive entry (no OLSR data)
 		}
 
@@ -43,6 +46,9 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 		var firstname, lastname string
 		switch {
 		case entry.LastName == "" && entry.FirstName == "" && entry.Callsign == "":
+			if debug {
+				fmt.Printf("Export/Grandstream: Ignoring entry with empty contact: %+v\n", entry)
+			}
 			continue // there's no point in adding an empty contact
 		case entry.LastName == "" && entry.FirstName == "":
 			firstname = fmt.Sprintf("%s%s", pfx, entry.Callsign)

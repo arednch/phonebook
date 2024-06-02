@@ -3,6 +3,7 @@ package exporter
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 
 	"github.com/emersion/go-vcard"
 
@@ -11,18 +12,24 @@ import (
 
 type VCard struct{}
 
-func (v *VCard) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive bool) ([]byte, error) {
+func (v *VCard) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) ([]byte, error) {
 	var b bytes.Buffer
 	out := bufio.NewWriter(&b)
 	enc := vcard.NewEncoder(out)
 
 	for _, entry := range entries {
 		if filterInactive && entry.OLSR == nil {
+			if debug {
+				fmt.Printf("Export/vCard: Filtering inactive entry %+v\n", entry)
+			}
 			continue // ignoring inactive entry (no OLSR data)
 		}
 
 		name := NameForEntry(entry, indicateActive, activePfx)
 		if name == "" {
+			if debug {
+				fmt.Printf("Export/vCard: Ignoring entry with empty contact: %+v\n", entry)
+			}
 			continue // ignore empty contacts
 		}
 

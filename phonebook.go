@@ -31,6 +31,7 @@ var (
 	sysInfoURL = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
 	daemonize  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 	ldapServer = flag.Bool("ldap_server", false, "Phonebook also runs an LDAP server when in server mode.")
+	debug      = flag.Bool("debug", false, "Turns on verbose logging to stdout when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
@@ -59,7 +60,10 @@ var (
 	exporters map[string]exporter.Exporter
 )
 
-func refreshRecords(source, olsrFile, sysInfoURL string) error {
+func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
+	if debug {
+		fmt.Printf("Reading phonebook from %q\n", source)
+	}
 	rec, err := importer.ReadPhonebook(source)
 	if err != nil {
 		return err
@@ -108,8 +112,11 @@ func refreshRecords(source, olsrFile, sysInfoURL string) error {
 	return nil
 }
 
-func exportOnce(path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive bool) error {
+func exportOnce(path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive, debug bool) error {
 	for _, outTgt := range targets {
+		if debug {
+			fmt.Printf("Exporting for target %q\n", outTgt)
+		}
 		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
 		exp, ok := exporters[outTgt]
 		if !ok {
@@ -117,23 +124,26 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 		}
 
 		for _, outFmt := range formats {
+			if debug {
+				fmt.Printf("Exporting for format %q\n", outFmt)
+			}
 			switch strings.ToLower(strings.TrimSpace(outFmt)) {
 			case "d", "direct": // Direct calling phonebook.
-				body, err := exp.Export(records.Entries, exporter.FormatDirect, activePfx, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records.Entries, exporter.FormatDirect, activePfx, resolve, indicateActive, filterInactive, debug)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
-				body, err := exp.Export(records.Entries, exporter.FormatPBX, activePfx, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records.Entries, exporter.FormatPBX, activePfx, resolve, indicateActive, filterInactive, debug)
 				if err != nil {
 					return err
 				}
 				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outTgt))
 				os.WriteFile(outpath, body, 0644)
 			case "c", "combined":
-				body, err := exp.Export(records.Entries, exporter.FormatCombined, activePfx, resolve, indicateActive, filterInactive)
+				body, err := exp.Export(records.Entries, exporter.FormatCombined, activePfx, resolve, indicateActive, filterInactive, debug)
 				if err != nil {
 					return err
 				}
@@ -171,7 +181,7 @@ func runServer(cfg *configuration.Config) error {
 
 	go func() {
 		for {
-			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
+			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL, cfg.Debug); err != nil {
 				fmt.Printf("error refreshing data from upstream: %s\n", err)
 			}
 			time.Sleep(cfg.Reload)
@@ -193,10 +203,10 @@ func runServer(cfg *configuration.Config) error {
 }
 
 func runLocal(cfg *configuration.Config) error {
-	if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL); err != nil {
+	if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL, cfg.Debug); err != nil {
 		return err
 	}
-	if err := exportOnce(cfg.Path, cfg.ActivePfx, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive); err != nil {
+	if err := exportOnce(cfg.Path, cfg.ActivePfx, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive, cfg.Debug); err != nil {
 		return err
 	}
 
@@ -234,6 +244,7 @@ func main() {
 			SysInfoURL:     *sysInfoURL,
 			Server:         *daemonize,
 			LDAPServer:     *ldapServer,
+			Debug:          *debug,
 			Path:           *path,
 			Formats:        strings.Split(*formats, ","),
 			Targets:        strings.Split(*targets, ","),
@@ -255,11 +266,18 @@ func main() {
 	}
 
 	if cfg.Server {
+		if *debug {
+			fmt.Println("Running phonebook in server mode")
+		}
 		if err := runServer(cfg); err != nil {
 			fmt.Printf("unable to run server: %s\n", err)
 			os.Exit(1)
 		}
 	} else {
+		if *debug {
+			fmt.Println("Running phonebook as a one-time export")
+		}
+
 		if cfg.Path == "" {
 			fmt.Println("path needs to be set")
 			os.Exit(1)

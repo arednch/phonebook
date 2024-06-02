@@ -11,6 +11,7 @@ Generally applicable:
 - `sysinfo`: URL from which to fetch AREDN sysinfo. Usually: `http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1`
 - `server`: Phonebook acts as a server when set to true. Default: false
 - `ldap_server`: When the phonebook is running as a server, it also exposes an LDAP v3 server when set to true. Default: false
+- `debug`: Print verbose debug messages on stdout when set to true. Default: false
 
 Only relevant when running in **non-server / ad-hoc mode**:
 

@@ -13,6 +13,7 @@ type Config struct {
 	SysInfoURL string `json:"sysinfo_url"`
 	Server     bool   `json:"server"`
 	LDAPServer bool   `json:"ldap_server"`
+	Debug      bool   `json:"debug"`
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	Path           string   `json:"path"`

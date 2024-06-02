@@ -13,13 +13,13 @@ type CiscoPhonebook struct {
 
 type Cisco struct{}
 
-func (c *Cisco) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive bool) ([]byte, error) {
+func (c *Cisco) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) ([]byte, error) {
 	return xml.MarshalIndent(struct {
 		*CiscoPhonebook
 		*data.GenericPhoneBook
 		XMLName struct{} `xml:"CiscoIPPhoneDirectory"`
 	}{
-		GenericPhoneBook: export(entries, format, activePfx, resolve, indicateActive, filterInactive),
+		GenericPhoneBook: export(entries, format, activePfx, resolve, indicateActive, filterInactive, debug),
 		CiscoPhonebook: &CiscoPhonebook{
 			Title:  "Cisco Coporate Directory",
 			Prompt: "Select the User",

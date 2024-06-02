@@ -60,18 +60,24 @@ func TelefoneForEntry(entry *data.Entry, resolve bool, format Format) []string {
 type Format string
 
 type Exporter interface {
-	Export([]*data.Entry, Format, string, bool, bool, bool) ([]byte, error)
+	Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) ([]byte, error)
 }
 
-func export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive bool) *data.GenericPhoneBook {
+func export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) *data.GenericPhoneBook {
 	var targetEntries []*data.GenericEntry
 	for _, entry := range entries {
 		if filterInactive && entry.OLSR == nil {
+			if debug {
+				fmt.Printf("Export/Generic: Filtering inactive entry: %+v\n", entry)
+			}
 			continue // ignoring inactive entry (no OLSR data)
 		}
 
 		name := NameForEntry(entry, indicateActive, activePfx)
 		if name == "" {
+			if debug {
+				fmt.Printf("Export/Generic: Ignoring entry with empty contact: %+v\n", entry)
+			}
 			continue // ignore empty contacts
 		}
 		targetEntries = append(targetEntries, &data.GenericEntry{
@@ -85,11 +91,11 @@ func export(entries []*data.Entry, format Format, activePfx string, resolve, ind
 
 type Generic struct{}
 
-func (g *Generic) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive bool) ([]byte, error) {
+func (g *Generic) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) ([]byte, error) {
 	return xml.MarshalIndent(struct {
 		*data.GenericPhoneBook
 		XMLName struct{} `xml:"IPPhoneDirectory"`
 	}{
-		GenericPhoneBook: export(entries, format, activePfx, resolve, indicateActive, filterInactive),
+		GenericPhoneBook: export(entries, format, activePfx, resolve, indicateActive, filterInactive, debug),
 	}, "", "    ")
 }

@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"regexp"
@@ -16,6 +17,16 @@ import (
 var (
 	filterRE = regexp.MustCompile(`\(\w*=\*?([a-zA-Z0-9]+)\*?\)`)
 )
+
+func CookieToIdx(c []byte) uint32 {
+	return binary.LittleEndian.Uint32(c)
+}
+
+func IdxToCookie(idx uint32) []byte {
+	c := make([]byte, 4)
+	binary.LittleEndian.PutUint32(c, idx)
+	return c
+}
 
 type Server struct {
 	Config *configuration.Config
@@ -48,6 +59,8 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 		fmt.Printf("LDAP/Search: Search filter %q, searching for %q\n", searchReq.Filter, searchQuery)
 	}
 	sort.Sort(data.ByName(s.Records.Entries))
+
+	// Populate a (sorted) list of results for the given search query.
 	entries := []*ldapserver.Entry{}
 	for _, entry := range s.Records.Entries {
 		if s.Config.FilterInactive && entry.OLSR == nil {
@@ -133,18 +146,57 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 			DN:         fmt.Sprintf("sn=%s,%s", name, searchReq.BaseDN),
 			Attributes: attrs,
 		})
-		// limit search results to first X hits
-		if searchReq.SizeLimit > 0 && len(entries) >= searchReq.SizeLimit {
-			if s.Config.Debug {
-				fmt.Printf("LDAP/Search: Reached search size limit provided by client (%d). Returning %d results.\n", searchReq.SizeLimit, len(entries))
-			}
+	}
+
+	// If there's no search size limit or fewer entries than the search size limit, we return them immediately.
+	if searchReq.SizeLimit <= 0 || len(entries) <= searchReq.SizeLimit {
+		return ldapserver.ServerSearchResult{
+			Entries:    entries,
+			Referrals:  []string{},
+			Controls:   []ldapserver.Control{},
+			ResultCode: ldapserver.LDAPResultSuccess,
+		}, nil
+	}
+
+	// Based on the overall results, filter down the ones to return based on size limit and paging.
+	// First, get a potentially already existing paging control.
+	var ctrl *ldapserver.ControlPaging
+	for _, c := range searchReq.Controls {
+		if c.GetControlType() == ldapserver.ControlTypePaging {
+			ctrl = c.(*ldapserver.ControlPaging)
 			break
 		}
 	}
+	if ctrl == nil {
+		ctrl = ldapserver.NewControlPaging(uint32(searchReq.SizeLimit))
+	}
+
+	// Determine where we left of last time.
+	start := uint32(0)
+	if ctrl.Cookie != nil {
+		start = CookieToIdx(ctrl.Cookie)
+	}
+	results := []*ldapserver.Entry{}
+	for i, entry := range entries {
+		if uint32(i) < start {
+			// Ignore results that we already returned.
+			continue
+		}
+		if len(results) >= searchReq.SizeLimit {
+			if s.Config.Debug {
+				fmt.Printf("LDAP/Search: Reached search size limit provided by client (%d). Returning %d out of %d results.\n", searchReq.SizeLimit, len(results), len(entries))
+			}
+			break
+		}
+		results = append(results, entry)
+	}
+	ctrl.SetCookie(IdxToCookie(start + uint32(len(results))))
 	return ldapserver.ServerSearchResult{
-		Entries:    entries,
-		Referrals:  []string{},
-		Controls:   []ldapserver.Control{},
+		Entries:   results,
+		Referrals: []string{},
+		Controls: []ldapserver.Control{
+			ctrl,
+		},
 		ResultCode: ldapserver.LDAPResultSuccess,
 	}, nil
 }

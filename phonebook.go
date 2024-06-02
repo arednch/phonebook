@@ -264,6 +264,10 @@ func main() {
 			LDAPPwd:        *ldapPwd,
 		}
 	}
+	// Detect when flag is set to run as a server even when reading config.
+	if *daemonize {
+		cfg.Server = *daemonize
+	}
 
 	if cfg.Source == "" {
 		fmt.Println("source needs to be set")

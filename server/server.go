@@ -11,11 +11,29 @@ import (
 	"github.com/arednch/phonebook/exporter"
 )
 
+type ReloadFunc func(source, olsrFile, sysInfoURL string, debug bool) error
+
 type Server struct {
 	Config *configuration.Config
 
 	Records   *data.Records
 	Exporters map[string]exporter.Exporter
+
+	ReloadFn ReloadFunc
+}
+
+func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
+	if err := s.ReloadFn(s.Config.Source, s.Config.OLSRFile, s.Config.SysInfoURL, s.Config.Debug); err != nil {
+		if s.Config.Debug {
+			fmt.Printf("/reload: unable to reload phonebook: %s\n", err)
+		}
+		http.Error(w, "unable to reload phonebook", http.StatusBadRequest)
+		return
+	}
+	fmt.Fprintf(w, "phonebook reloaded locally from %q", s.Config.Source)
+	if s.Config.Debug {
+		fmt.Printf("/reload: phonebook reloaded locally from %q\n", s.Config.Source)
+	}
 }
 
 func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {

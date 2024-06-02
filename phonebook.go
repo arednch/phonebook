@@ -195,8 +195,10 @@ func runServer(cfg *configuration.Config) error {
 		Config:    cfg,
 		Records:   records,
 		Exporters: exporters,
+		ReloadFn:  refreshRecords,
 	}
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
+	http.HandleFunc("/reload", srv.ReloadPhonebook)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		return err

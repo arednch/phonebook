@@ -26,7 +26,7 @@ import (
 
 var (
 	// Generally applicable flags.
-	conf       = flag.String("conf", "", "Config file to read settings from instead of parsing flags.")
+	conf       = flag.String("conf", "", "OpenWRT UCI tree path to read config from instead of parsing flags.")
 	source     = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
 	olsrFile   = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
 	sysInfoURL = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
@@ -235,7 +235,7 @@ func main() {
 
 	var cfg *configuration.Config
 	if *conf != "" {
-		if c, err := configuration.Read(*conf); err != nil {
+		if c, err := configuration.ReadFromUCI(*conf); err != nil {
 			fmt.Printf("unable to read config: %s\n", err)
 			os.Exit(1)
 		} else {

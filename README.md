@@ -1,6 +1,6 @@
 # Phonebook
 
-Phonebook conversion from CSV to XML intended to be used for AREDN.
+Phonebook conversion from CSV to a number of output formats intended to be used for AREDN.
 
 ## Flags
 
@@ -112,35 +112,37 @@ systemctl status phonebook.service
 
 ### Configuration
 
-Optionally, instead of passing flags, the config values can be read from a config file too:
+Optionally, instead of passing flags, the config values can be read from a [UCI config file](https://openwrt.org/docs/guide-user/base-system/uci) too:
 
 ```
-go run . -conf="config"
+go run . -conf="/etc/config/" -server
 ```
+
+Note: The "conf" flag does not point to the file but the folder the config (possibly among others) are in. Default on AREDN nodes should be "/etc/config/".
 
 A typical file would look like this:
 
 ```
-{
-	"source": "http://aredn-node.local.mesh:8080/phonebook.csv",
-	"olsr_file": "/tmp/run/hosts_olsr",
-	"sysinfo": "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1",
-	"server": false,
-  "path": "/www",
-	"formats": [
-		"direct",
-		"pbx",
-		"combined"
-	],
-	"targets": [
-		"yealink"
-	],
-	"resolve": false,
-	"indicate_active": true,
-	"filter_inactive": false,
-	"port": 8080,
-	"reload_seconds": 3600
-}
+config phonebook main
+	option source "/www/arednstack/phonebook.csv"
+	option olsr_file "/tmp/run/hosts_olsr"
+	option sysinfo_url "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1"
+	option debug "false"
+	option ldap_server "true"
+	option path "/www/arednstack"
+	list formats "combined"
+	list formats "direct"
+	list formats "pbx"
+	list targets "generic"
+	option resolve "false"
+	option indicate_active "true"
+	option filter_inactive "false"
+	option active_pfx "*"
+	option port 8081
+	option reload_seconds 3600
+	option ldap_port 3890
+	option ldap_user "aredn"
+	option ldap_pwd "aredn"
 ```
 
 The config allows to set the same paramaters as the flags (modulo the `conf` flag).

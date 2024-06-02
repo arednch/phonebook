@@ -1,6 +1,28 @@
 package data
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
+
+type ByName []*Entry
+
+func (e ByName) sortKeyForEntry(entry *Entry) string {
+	if entry.OLSR != nil {
+		// Mark active entries so they appear first.
+		return fmt.Sprintf("*%s %s %s", entry.LastName, entry.FirstName, entry.Callsign)
+	}
+	return fmt.Sprintf("%s %s %s", entry.LastName, entry.FirstName, entry.Callsign)
+}
+func (e ByName) Len() int           { return len(e) }
+func (e ByName) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
+func (e ByName) Less(i, j int) bool { return e.sortKeyForEntry(e[i]) < e.sortKeyForEntry(e[j]) }
+
+type ByCallsign []*Entry
+
+func (e ByCallsign) Len() int           { return len(e) }
+func (e ByCallsign) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
+func (e ByCallsign) Less(i, j int) bool { return e[i].Callsign < e[j].Callsign }
 
 // Source
 

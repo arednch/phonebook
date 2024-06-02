@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/mark-rushakoff/ldapserver"
@@ -46,7 +47,7 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 	if s.Config.Debug {
 		fmt.Printf("LDAP/Search: Search filter %q, searching for %q\n", searchReq.Filter, searchQuery)
 	}
-
+	sort.Sort(data.ByName(s.Records.Entries))
 	entries := []*ldapserver.Entry{}
 	for _, entry := range s.Records.Entries {
 		if s.Config.FilterInactive && entry.OLSR == nil {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -113,6 +114,8 @@ func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
 }
 
 func exportOnce(path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive, debug bool) error {
+	sort.Sort(data.ByName(records.Entries))
+
 	for _, outTgt := range targets {
 		if debug {
 			fmt.Printf("Exporting for target %q\n", outTgt)

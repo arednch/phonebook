@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 
@@ -111,10 +112,20 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 		})
 	}
 
-	return xml.MarshalIndent(struct {
+	b, err := xml.MarshalIndent(struct {
 		*GrandstreamPhonebook
 		XMLName struct{} `xml:"AddressBook"`
 	}{
 		GrandstreamPhonebook: &GrandstreamPhonebook{Entry: targetEntries},
 	}, "", "    ")
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert to XML: %s", err)
+	}
+
+	w := &bytes.Buffer{}
+	w.WriteString(xml.Header)
+	if _, err := w.Write(b); err != nil {
+		return nil, fmt.Errorf("unable to write XML: %s", err)
+	}
+	return w.Bytes(), nil
 }

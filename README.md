@@ -160,3 +160,11 @@ Additionally, the following parameters are supported:
 - `resolve`: Set to `true` in order to attempt to resolve hostnames to IPs for phones based on OLSR data (this assumes that the data is available.)
 - `ia`: Set to `true` in order to indicate active phones (i.e. there's a route) in the directory.
 - `fi`: Set to `true` in order to filter the directory to just the active phones.
+
+## Supported Devices
+
+Note: The following list is not complete. It will work with many more devices. This is the list of "confirmed tested" devices at some point in time (not with every release!). If you have other devices that work, please let us know.
+
+- Yealink T41P: XML (`generic`, `yealink`), LDAP
+- Yealink T48G: XML (`generic`, `yealink`), LDAP
+- Linphone (iOS, iPadOS, Android, Chromebook, Ubuntu): LDAP

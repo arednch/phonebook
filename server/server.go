@@ -9,17 +9,60 @@ import (
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
 	"github.com/arednch/phonebook/exporter"
+	"github.com/digineo/go-uci"
 )
 
 type ReloadFunc func(source, olsrFile, sysInfoURL string, debug bool) error
 
 type Server struct {
-	Config *configuration.Config
+	Config     *configuration.Config
+	ConfigPath string // optional when using UCI config
 
 	Records   *data.Records
 	Exporters map[string]exporter.Exporter
 
 	ReloadFn ReloadFunc
+}
+
+func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	if s.ConfigPath == "" {
+		http.Error(w, "phonebook was not started with a config path set ('-conf' flag)", http.StatusBadRequest)
+		return
+	}
+
+	u := uci.NewTree(s.ConfigPath)
+	if err := u.LoadConfig(configuration.UCIConfig, true); err != nil {
+		if s.Config.Debug {
+			fmt.Printf("/config: unable read config: %s\n", err)
+		}
+		http.Error(w, "unable to read config", http.StatusBadRequest)
+		return
+	}
+
+	src := r.FormValue("source")
+	if src != "" {
+		if exist := u.SetType("phonebook", "main", "source", uci.TypeOption, src); !exist {
+			if s.Config.Debug {
+				fmt.Println("/config: unable to set 'source': section or file does not exist")
+			}
+			http.Error(w, "unable to set 'source': section or file does not exist", http.StatusBadRequest)
+			return
+		}
+		s.Config.Source = src // reflecting change in loaded config to avoid having to restart
+	}
+
+	if err := u.Commit(); err != nil {
+		if s.Config.Debug {
+			fmt.Printf("/config: unable to commit config: %s\n", err)
+		}
+		http.Error(w, "unable to commit config", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Fprintf(w, "phonebook config updated in %q", s.ConfigPath)
+	if s.Config.Debug {
+		fmt.Printf("/config: phonebook config updated in %q\n", s.ConfigPath)
+	}
 }
 
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {

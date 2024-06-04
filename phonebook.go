@@ -52,13 +52,17 @@ var (
 )
 
 const (
-	sipSeparator = "@"
+	sipSeparator     = "@"
+	defaultExtension = ".xml"
 )
 
 var (
-	records *data.Records
-
+	records   *data.Records
 	exporters map[string]exporter.Exporter
+
+	extensions = map[string]string{
+		"vcard": ".vcf",
+	}
 )
 
 func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
@@ -126,6 +130,11 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 			return fmt.Errorf("unknown target %q", outTgt)
 		}
 
+		ext, ok := extensions[outTgt]
+		if !ok {
+			ext = defaultExtension
+		}
+
 		for _, outFmt := range formats {
 			if debug {
 				fmt.Printf("Exporting for format %q\n", outFmt)
@@ -136,21 +145,21 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 				if err != nil {
 					return err
 				}
-				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct.xml", outTgt))
+				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct%s", outTgt, ext))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
 				body, err := exp.Export(records.Entries, exporter.FormatPBX, activePfx, resolve, indicateActive, filterInactive, debug)
 				if err != nil {
 					return err
 				}
-				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx.xml", outTgt))
+				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx%s", outTgt, ext))
 				os.WriteFile(outpath, body, 0644)
 			case "c", "combined":
 				body, err := exp.Export(records.Entries, exporter.FormatCombined, activePfx, resolve, indicateActive, filterInactive, debug)
 				if err != nil {
 					return err
 				}
-				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_combined.xml", outTgt))
+				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_combined%s", outTgt, ext))
 				os.WriteFile(outpath, body, 0644)
 			default:
 				return fmt.Errorf("unknown format: %q", outFmt)
@@ -161,7 +170,7 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 	return nil
 }
 
-func runServer(cfg *configuration.Config) error {
+func runServer(cfg *configuration.Config, cfgPath string) error {
 	if cfg.Source == "" {
 		return errors.New("source needs to be set")
 	}
@@ -192,13 +201,15 @@ func runServer(cfg *configuration.Config) error {
 	}()
 
 	srv := &server.Server{
-		Config:    cfg,
-		Records:   records,
-		Exporters: exporters,
-		ReloadFn:  refreshRecords,
+		Config:     cfg,
+		ConfigPath: cfgPath,
+		Records:    records,
+		Exporters:  exporters,
+		ReloadFn:   refreshRecords,
 	}
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
 	http.HandleFunc("/reload", srv.ReloadPhonebook)
+	http.HandleFunc("/config", srv.UpdateConfig)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		return err
@@ -278,7 +289,7 @@ func main() {
 		if *debug {
 			fmt.Println("Running phonebook in server mode")
 		}
-		if err := runServer(cfg); err != nil {
+		if err := runServer(cfg, *conf); err != nil {
 			fmt.Printf("unable to run server: %s\n", err)
 			os.Exit(1)
 		}

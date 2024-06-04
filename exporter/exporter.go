@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 
@@ -92,10 +93,20 @@ func export(entries []*data.Entry, format Format, activePfx string, resolve, ind
 type Generic struct{}
 
 func (g *Generic) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) ([]byte, error) {
-	return xml.MarshalIndent(struct {
+	b, err := xml.MarshalIndent(struct {
 		*data.GenericPhoneBook
 		XMLName struct{} `xml:"IPPhoneDirectory"`
 	}{
 		GenericPhoneBook: export(entries, format, activePfx, resolve, indicateActive, filterInactive, debug),
 	}, "", "    ")
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert to XML: %s", err)
+	}
+
+	w := &bytes.Buffer{}
+	w.WriteString(xml.Header)
+	if _, err := w.Write(b); err != nil {
+		return nil, fmt.Errorf("unable to write XML: %s", err)
+	}
+	return w.Bytes(), nil
 }

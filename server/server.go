@@ -25,43 +25,52 @@ type Server struct {
 }
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var u uci.Tree
 	if s.ConfigPath == "" {
-		http.Error(w, "phonebook was not started with a config path set ('-conf' flag)", http.StatusBadRequest)
-		return
-	}
-
-	u := uci.NewTree(s.ConfigPath)
-	if err := u.LoadConfig(configuration.UCIConfig, true); err != nil {
-		if s.Config.Debug {
-			fmt.Printf("/config: unable read config: %s\n", err)
+		fmt.Fprintln(w, "phonebook was not started with a config path set ('-conf' flag) so UCI config won't be updated")
+	} else {
+		u = uci.NewTree(s.ConfigPath)
+		if err := u.LoadConfig(configuration.UCIConfig, true); err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/config: unable read config: %s\n", err)
+			}
+			http.Error(w, "unable to read config", http.StatusBadRequest)
+			return
 		}
-		http.Error(w, "unable to read config", http.StatusBadRequest)
-		return
 	}
 
 	src := r.FormValue("source")
 	if src != "" {
-		if exist := u.SetType("phonebook", "main", "source", uci.TypeOption, src); !exist {
-			if s.Config.Debug {
-				fmt.Println("/config: unable to set 'source': section or file does not exist")
+		if u != nil {
+			if exist := u.SetType("phonebook", "main", "source", uci.TypeOption, src); !exist {
+				if s.Config.Debug {
+					fmt.Println("/config: unable to set 'source': section or file does not exist")
+				}
+				http.Error(w, "unable to set 'source': section or file does not exist", http.StatusBadRequest)
+				return
 			}
-			http.Error(w, "unable to set 'source': section or file does not exist", http.StatusBadRequest)
-			return
 		}
 		s.Config.Source = src // reflecting change in loaded config to avoid having to restart
 	}
 
-	if err := u.Commit(); err != nil {
-		if s.Config.Debug {
-			fmt.Printf("/config: unable to commit config: %s\n", err)
+	if u != nil {
+		if err := u.Commit(); err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/config: unable to commit config: %s\n", err)
+			}
+			http.Error(w, "unable to commit config", http.StatusBadRequest)
+			return
 		}
-		http.Error(w, "unable to commit config", http.StatusBadRequest)
-		return
-	}
 
-	fmt.Fprintf(w, "phonebook config updated in %q", s.ConfigPath)
-	if s.Config.Debug {
-		fmt.Printf("/config: phonebook config updated in %q\n", s.ConfigPath)
+		fmt.Fprintf(w, "phonebook config updated in %q\n", s.ConfigPath)
+		if s.Config.Debug {
+			fmt.Printf("/config: phonebook config updated in %q\n", s.ConfigPath)
+		}
+	} else {
+		fmt.Fprintln(w, "phonebook runtime (!) config")
+		if s.Config.Debug {
+			fmt.Println("/config: phonebook runtime (!) config updated")
+		}
 	}
 }
 

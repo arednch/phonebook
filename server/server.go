@@ -51,6 +51,10 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		s.Config.Source = src // reflecting change in loaded config to avoid having to restart
+		fmt.Fprintf(w, "- source now set (but not validated!): %q\n", src)
+		if s.Config.Debug {
+			fmt.Printf("/config: source now set (but not validated): %q\n", src)
+		}
 	}
 
 	if u != nil {
@@ -67,7 +71,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("/config: phonebook config updated in %q\n", s.ConfigPath)
 		}
 	} else {
-		fmt.Fprintln(w, "phonebook runtime (!) config")
+		fmt.Fprintln(w, "phonebook runtime (!) config updated")
 		if s.Config.Debug {
 			fmt.Println("/config: phonebook runtime (!) config updated")
 		}

@@ -38,6 +38,13 @@ type Entry struct {
 	IPAddress   string
 	PhoneNumber string
 
+	// Optional data
+	Email  string
+	Club   string
+	Mobile string
+	Street string
+	City   string
+
 	// Metadata
 	OLSR *OLSR // if present, the participant seems to be active
 }

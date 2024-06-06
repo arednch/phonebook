@@ -72,14 +72,26 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 			strings.TrimSpace(r[4]) == "" {
 			break
 		}
+		// check if entry is marked as private and if so, skip it
+		if len(r) > 11 && strings.TrimSpace(r[11]) == "Y" {
+			continue
+		}
 
-		records = append(records, &data.Entry{
+		entry := &data.Entry{
 			FirstName:   strings.TrimSpace(r[0]),
 			LastName:    strings.TrimSpace(r[1]),
 			Callsign:    strings.TrimSpace(r[2]),
 			IPAddress:   strings.TrimSpace(r[3]),
 			PhoneNumber: strings.TrimSpace(r[4]),
-		})
+		}
+		if len(r) > 9 {
+			entry.Email = strings.TrimSpace(r[5])
+			entry.Club = strings.TrimSpace(r[6])
+			entry.Mobile = strings.TrimSpace(r[7])
+			entry.Street = strings.TrimSpace(r[8])
+			entry.City = strings.TrimSpace(r[9])
+		}
+		records = append(records, entry)
 	}
 
 	return records, nil

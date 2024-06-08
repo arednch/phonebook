@@ -186,7 +186,7 @@ func runServer(cfg *configuration.Config, cfgPath string) error {
 
 		go func() {
 			if err := s.ListenAndServe(fmt.Sprintf(":%d", cfg.LDAPPort)); err != nil {
-				fmt.Printf("LDAP server failed: %s", err)
+				fmt.Printf("LDAP server failed: %s\n", err)
 			}
 		}()
 	}

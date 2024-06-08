@@ -96,22 +96,24 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 			continue
 		}
 
-		var telAttrs []string
+		telAttrs := map[string]bool{}
 		for _, frmt := range s.Config.Formats {
 			switch frmt {
 			case "direct":
 				if s.Config.Resolve && entry.OLSR != nil {
-					telAttrs = append(telAttrs, entry.OLSR.IP)
+					telAttrs[entry.OLSR.IP] = true
 				} else {
-					telAttrs = append(telAttrs, entry.IPAddress)
+					telAttrs[entry.IPAddress] = true
 				}
 			case "pbx":
-				telAttrs = append(telAttrs, entry.PhoneNumber)
+				telAttrs[entry.PhoneNumber] = true
 			default:
 				if s.Config.Resolve && entry.OLSR != nil {
-					telAttrs = append(telAttrs, entry.OLSR.IP, entry.PhoneNumber)
+					telAttrs[entry.OLSR.IP] = true
+					telAttrs[entry.PhoneNumber] = true
 				} else {
-					telAttrs = append(telAttrs, entry.IPAddress, entry.PhoneNumber)
+					telAttrs[entry.IPAddress] = true
+					telAttrs[entry.PhoneNumber] = true
 				}
 			}
 		}
@@ -119,9 +121,9 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 		attrs := []*ldapserver.EntryAttribute{
 			{Name: "objectClass", Values: []string{"person"}},
 
-			{Name: "displayName", Values: []string{name}},
+			{Name: "displayname", Values: []string{name}},
 			{Name: "cn", Values: []string{name}},
-			{Name: "meshName", Values: []string{name}},
+			{Name: "meshname", Values: []string{name}},
 			{Name: "firstname", Values: []string{entry.FirstName}},
 			{Name: "gn", Values: []string{entry.FirstName}},
 			{Name: "lastname", Values: []string{entry.LastName}},
@@ -136,9 +138,9 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 		}
 
 		// Populate Linphone default as a single address.
-		for _, tel := range telAttrs {
+		for k := range telAttrs {
 			attrs = append(attrs, []*ldapserver.EntryAttribute{
-				{Name: "sipPhone", Values: []string{tel}},
+				{Name: "sipPhone", Values: []string{k}},
 			}...)
 		}
 

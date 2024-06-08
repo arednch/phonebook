@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	eofSignal   = "ENDOFFILE"
-	privateMark = "Y"
+	eofSignal = "ENDOFFILE"
 )
 
 func ReadFromURL(url string) ([]byte, error) {
@@ -74,7 +73,7 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 			break
 		}
 		// check if entry is marked as private and if so, skip it
-		if len(r) > 11 && strings.EqualFold(strings.TrimSpace(r[11]), privateMark) {
+		if len(r) > 11 && strings.TrimSpace(r[11]) == "Y" {
 			continue
 		}
 

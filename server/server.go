@@ -9,14 +9,13 @@ import (
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
 	"github.com/arednch/phonebook/exporter"
-	"github.com/digineo/go-uci"
 )
 
 type ReloadFunc func(source, olsrFile, sysInfoURL string, debug bool) error
 
 type Server struct {
 	Config     *configuration.Config
-	ConfigPath string // optional when using UCI config
+	ConfigPath string // optional when using config file
 
 	Records   *data.Records
 	Exporters map[string]exporter.Exporter
@@ -25,44 +24,36 @@ type Server struct {
 }
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
-	var u uci.Tree
+	var cfg *configuration.Config
 	if s.ConfigPath == "" {
-		fmt.Fprintln(w, "phonebook was not started with a config path set ('-conf' flag) so UCI config won't be updated")
+		fmt.Fprintln(w, "phonebook was not started with a config path set ('-conf' flag) so config file won't be updated")
 	} else {
-		u = uci.NewTree(s.ConfigPath)
-		if err := u.LoadConfig(configuration.UCIConfig, true); err != nil {
+		var err error
+		if cfg, err = configuration.ReadFromJSON(s.ConfigPath); err != nil {
 			if s.Config.Debug {
-				fmt.Printf("/config: unable read config: %s\n", err)
+				fmt.Printf("/config: unable to read config: %s\n", err)
 			}
-			http.Error(w, "unable to read config", http.StatusBadRequest)
+			http.Error(w, "unable to read config", http.StatusInternalServerError)
 			return
 		}
+		fmt.Fprintln(w, "phonebook config changes will be reflected in", s.ConfigPath)
 	}
 
 	src := r.FormValue("source")
 	if src != "" {
-		if u != nil {
-			if exist := u.SetType("phonebook", "main", "source", uci.TypeOption, src); !exist {
-				if s.Config.Debug {
-					fmt.Println("/config: unable to set 'source': section or file does not exist")
-				}
-				http.Error(w, "unable to set 'source': section or file does not exist", http.StatusBadRequest)
-				return
-			}
-		}
-		s.Config.Source = src // reflecting change in loaded config to avoid having to restart
+		s.Config.Source = src
 		fmt.Fprintf(w, "- source now set (but not validated!): %q\n", src)
 		if s.Config.Debug {
 			fmt.Printf("/config: source now set (but not validated): %q\n", src)
 		}
 	}
 
-	if u != nil {
-		if err := u.Commit(); err != nil {
+	if cfg != nil {
+		if err := configuration.WriteToJSON(cfg, s.ConfigPath); err != nil {
 			if s.Config.Debug {
-				fmt.Printf("/config: unable to commit config: %s\n", err)
+				fmt.Printf("/config: unable to write config: %s\n", err)
 			}
-			http.Error(w, "unable to commit config", http.StatusBadRequest)
+			http.Error(w, "unable to write config", http.StatusInternalServerError)
 			return
 		}
 
@@ -71,9 +62,9 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("/config: phonebook config updated in %q\n", s.ConfigPath)
 		}
 	} else {
-		fmt.Fprintln(w, "phonebook runtime (!) config updated")
+		fmt.Fprintln(w, "only phonebook runtime (!) config updated")
 		if s.Config.Debug {
-			fmt.Println("/config: phonebook runtime (!) config updated")
+			fmt.Println("/config: only phonebook runtime (!) config updated")
 		}
 	}
 }
@@ -83,7 +74,7 @@ func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
 		if s.Config.Debug {
 			fmt.Printf("/reload: unable to reload phonebook: %s\n", err)
 		}
-		http.Error(w, "unable to reload phonebook", http.StatusBadRequest)
+		http.Error(w, "unable to reload phonebook", http.StatusInternalServerError)
 		return
 	}
 	fmt.Fprintf(w, "phonebook reloaded locally from %q", s.Config.Source)

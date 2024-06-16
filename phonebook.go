@@ -246,7 +246,7 @@ func main() {
 
 	var cfg *configuration.Config
 	if *conf != "" {
-		if c, err := configuration.ReadFromUCI(*conf); err != nil {
+		if c, err := configuration.ReadFromJSON(*conf); err != nil {
 			fmt.Printf("unable to read config: %s\n", err)
 			os.Exit(1)
 		} else {

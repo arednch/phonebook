@@ -112,37 +112,40 @@ systemctl status phonebook.service
 
 ### Configuration
 
-Optionally, instead of passing flags, the config values can be read from a [UCI config file](https://openwrt.org/docs/guide-user/base-system/uci) too:
+Optionally, instead of passing flags, the config values can be read from a JSON config file too:
 
 ```
-go run . -conf="/etc/config/" -server
+go run . -conf="/etc/phonebook.conf" -server
 ```
-
-Note: The "conf" flag does not point to the file but the folder the config (possibly among others) are in. Default on AREDN nodes should be "/etc/config/".
 
 A typical file would look like this:
 
 ```
-config phonebook main
-	option source "/www/arednstack/phonebook.csv"
-	option olsr_file "/tmp/run/hosts_olsr"
-	option sysinfo_url "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1"
-	option debug "false"
-	option ldap_server "true"
-	option path "/www/arednstack"
-	list formats "combined"
-	list formats "direct"
-	list formats "pbx"
-	list targets "generic"
-	option resolve "false"
-	option indicate_active "true"
-	option filter_inactive "false"
-	option active_pfx "*"
-	option port 8081
-	option reload_seconds 3600
-	option ldap_port 3890
-	option ldap_user "aredn"
-	option ldap_pwd "aredn"
+{
+	"source": "/www/arednstack/phonebook.csv",
+	"olsr_file": "/tmp/run/hosts_olsr",
+	"sysinfo_url": "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1",
+	"ldap_server": true,
+	"debug": false,
+	"path": "/www/arednstack",
+	"formats": [
+		"combined",
+		"direct",
+		"pbx"
+	],
+	"targets": [
+		"generic"
+	],
+	"resolve": false,
+	"indicate_active": true,
+	"filter_inactive": false,
+	"active_pfx": "*",
+	"port": 8081,
+	"reload_seconds": 3600,
+	"ldap_port": 3890,
+	"ldap_user": "aredn",
+	"ldap_pwd": "aredn"
+}
 ```
 
 The config allows to set the same paramaters as the flags (modulo the `conf` flag).

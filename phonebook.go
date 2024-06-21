@@ -124,6 +124,8 @@ func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
 }
 
 func exportOnce(path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive, debug bool) error {
+	records.Mu.RLock()
+	defer records.Mu.RUnlock()
 	sort.Sort(data.ByName(records.Entries))
 
 	for _, outTgt := range targets {
@@ -212,9 +214,10 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 		}
 
 		s := &sip.Server{
-			Config: cfg,
-			UA:     ua,
-			Srv:    srv,
+			Config:  cfg,
+			Records: records,
+			UA:      ua,
+			Srv:     srv,
 		}
 		srv.OnRegister(s.OnRegister)
 		srv.OnInvite(s.OnInvite)

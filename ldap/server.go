@@ -58,6 +58,8 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 	if s.Config.Debug {
 		fmt.Printf("LDAP/Search: Search filter %q, searching for %q\n", searchReq.Filter, searchQuery)
 	}
+	s.Records.Mu.RLock()
+	defer s.Records.Mu.RUnlock()
 	sort.Sort(data.ByName(s.Records.Entries))
 
 	// Populate a (sorted) list of results for the given search query.

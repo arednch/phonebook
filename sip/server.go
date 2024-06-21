@@ -7,10 +7,13 @@ import (
 	"github.com/emiago/sipgo/sip"
 
 	"github.com/arednch/phonebook/configuration"
+	"github.com/arednch/phonebook/data"
 )
 
 type Server struct {
 	Config *configuration.Config
+
+	Records *data.Records
 
 	UA  *sipgo.UserAgent
 	Srv *sipgo.Server
@@ -28,7 +31,7 @@ func (s *Server) OnRegister(req *sip.Request, tx sip.ServerTransaction) {
 
 func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 	if s.Config.Debug {
-		fmt.Printf("SIP/Invite: received INVITE message from %s\n", req.Source())
+		fmt.Printf("SIP/Invite: received INVITE message from %q to %q\n", req.From(), req.To())
 	}
 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
 		fmt.Printf("SIP/Invite: error sending response: %s\n", err)

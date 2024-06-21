@@ -70,16 +70,13 @@ func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 	if redirect != nil {
 		resp := sip.NewResponseFromRequest(req, sip.StatusMovedTemporarily, "Moved Temporarily", nil)
 		resp.RemoveHeader("Via")
-		// resp.RemoveHeader("From")
-		// resp.RemoveHeader("To")
-		resp.AppendHeader(&sip.ContactHeader{
+		resp.AppendHeaderAfter(&sip.ContactHeader{
 			DisplayName: "AREDN Direct IP Call Transfer",
 			Address:     *redirect,
-		})
-		fmt.Printf("%+v\n", resp.Headers())
-		// if err := tx.Respond(resp); err != nil {
-		// 	fmt.Printf("SIP/Invite: error sending response: %s\n", err)
-		// }
+		}, "To")
+		if err := tx.Respond(resp); err != nil {
+			fmt.Printf("SIP/Invite: error sending response: %s\n", err)
+		}
 		return
 	}
 

@@ -5,6 +5,10 @@ import (
 	"sync"
 )
 
+const (
+	SIPSeparator = "@"
+)
+
 type ByName []*Entry
 
 func (e ByName) sortKeyForEntry(entry *Entry) string {

@@ -58,7 +58,6 @@ var (
 )
 
 const (
-	sipSeparator     = "@"
 	defaultExtension = ".xml"
 )
 
@@ -104,7 +103,7 @@ func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
 	}
 
 	for _, e := range rec {
-		addrParts := strings.Split(e.IPAddress, sipSeparator)
+		addrParts := strings.Split(e.IPAddress, data.SIPSeparator)
 		if len(addrParts) != 2 {
 			continue
 		}

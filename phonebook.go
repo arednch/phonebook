@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/emiago/sipgo"
-	emsip "github.com/emiago/sipgo/sip"
 	"github.com/mark-rushakoff/ldapserver"
+	"github.com/rs/zerolog"
 
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
@@ -198,7 +198,10 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 	}
 
 	if cfg.SIPServer {
-		emsip.SIPDebug = cfg.Debug
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+		if cfg.Debug {
+			zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		}
 		ua, err := sipgo.NewUA()
 		if err != nil {
 			return fmt.Errorf("unable to create SIP user agent: %s", err)

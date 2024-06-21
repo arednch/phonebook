@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/emiago/sipgo"
+	emsip "github.com/emiago/sipgo/sip"
 	"github.com/mark-rushakoff/ldapserver"
 
 	"github.com/arednch/phonebook/configuration"
@@ -22,6 +25,7 @@ import (
 	"github.com/arednch/phonebook/ldap"
 	"github.com/arednch/phonebook/olsr"
 	"github.com/arednch/phonebook/server"
+	"github.com/arednch/phonebook/sip"
 )
 
 var (
@@ -32,6 +36,7 @@ var (
 	sysInfoURL = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
 	daemonize  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 	ldapServer = flag.Bool("ldap_server", false, "Phonebook also runs an LDAP server when in server mode.")
+	sipServer  = flag.Bool("sip_server", false, "Phonebook also runs a SIP server when in server mode.")
 	debug      = flag.Bool("debug", false, "Turns on verbose logging to stdout when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
@@ -49,6 +54,7 @@ var (
 	ldapPort = flag.Int("ldap_port", 3890, "Port to listen on for the LDAP server (when running as a server AND LDAP server is on as well).")
 	ldapUser = flag.String("ldap_user", "aredn", "Username to provide to connect to the LDAP server.")
 	ldapPwd  = flag.String("ldap_pwd", "aredn", "Password to provide to connect to the LDAP server.")
+	sipPort  = flag.Int("sip_port", 5060, "Port to listen on for SIP traffic (when running as a server AND SIP server is on as well).")
 )
 
 const (
@@ -170,7 +176,7 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 	return nil
 }
 
-func runServer(cfg *configuration.Config, cfgPath string) error {
+func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) error {
 	if cfg.Source == "" {
 		return errors.New("source needs to be set")
 	}
@@ -187,6 +193,35 @@ func runServer(cfg *configuration.Config, cfgPath string) error {
 		go func() {
 			if err := s.ListenAndServe(fmt.Sprintf(":%d", cfg.LDAPPort)); err != nil {
 				fmt.Printf("LDAP server failed: %s\n", err)
+			}
+		}()
+	}
+
+	if cfg.SIPServer {
+		emsip.SIPDebug = cfg.Debug
+		ua, err := sipgo.NewUA()
+		if err != nil {
+			return fmt.Errorf("unable to create SIP user agent: %s", err)
+		}
+		srv, err := sipgo.NewServer(ua)
+		if err != nil {
+			return fmt.Errorf("unable to create SIP server: %s", err)
+		}
+
+		s := &sip.Server{
+			Config: cfg,
+			UA:     ua,
+			Srv:    srv,
+		}
+		srv.OnRegister(s.OnRegister)
+		srv.OnInvite(s.OnInvite)
+		srv.OnBye(s.OnBye)
+		srv.OnAck(s.OnAck)
+
+		go func() {
+			fmt.Println("Starting SIP Listener")
+			if err := s.Srv.ListenAndServe(ctx, "udp", fmt.Sprintf(":%d", cfg.SIPPort)); err != nil {
+				fmt.Printf("SIP server failed: %s\n", err)
 			}
 		}()
 	}
@@ -230,6 +265,7 @@ func runLocal(cfg *configuration.Config) error {
 }
 
 func main() {
+	ctx := context.Background()
 	// Parse flags globally.
 	flag.Parse()
 	records = &data.Records{
@@ -260,6 +296,7 @@ func main() {
 			SysInfoURL:     *sysInfoURL,
 			Server:         *daemonize,
 			LDAPServer:     *ldapServer,
+			SIPServer:      *sipServer,
 			Debug:          *debug,
 			Path:           *path,
 			Formats:        strings.Split(*formats, ","),
@@ -273,6 +310,7 @@ func main() {
 			LDAPPort:       *ldapPort,
 			LDAPUser:       *ldapUser,
 			LDAPPwd:        *ldapPwd,
+			SIPPort:        *sipPort,
 		}
 	}
 	// Detect when flag is set to run as a server even when reading config.
@@ -289,7 +327,7 @@ func main() {
 		if *debug {
 			fmt.Println("Running phonebook in server mode")
 		}
-		if err := runServer(cfg, *conf); err != nil {
+		if err := runServer(ctx, cfg, *conf); err != nil {
 			fmt.Printf("unable to run server: %s\n", err)
 			os.Exit(1)
 		}

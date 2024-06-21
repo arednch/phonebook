@@ -13,6 +13,7 @@ type Config struct {
 	SysInfoURL string `json:"sysinfo_url"`
 	Server     bool   `json:"server,omitempty"`
 	LDAPServer bool   `json:"ldap_server"`
+	SIPServer  bool   `json:"sip_server"`
 	Debug      bool   `json:"debug"`
 
 	// Only relevant when running in non-server / ad-hoc mode.
@@ -32,6 +33,8 @@ type Config struct {
 	LDAPPort int    `json:"ldap_port"`
 	LDAPUser string `json:"ldap_user"`
 	LDAPPwd  string `json:"ldap_pwd"`
+	// Only relevant when SIP server is on.
+	SIPPort int `json:"sip_port"`
 }
 
 func ReadFromJSON(path string) (*Config, error) {

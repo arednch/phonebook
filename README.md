@@ -11,6 +11,7 @@ Generally applicable:
 - `sysinfo`: URL from which to fetch AREDN sysinfo. Usually: `http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1`
 - `server`: Phonebook acts as a server when set to true. Default: false
 - `ldap_server`: When the phonebook is running as a server, it also exposes an LDAP v3 server when set to true. Default: false
+- `sip_server`: When the phonebook is running as a server, it also runs a _very_ simple SIP server when set to true. Default: false
 - `debug`: Print verbose debug messages on stdout when set to true. Default: false
 
 Only relevant when running in **non-server / ad-hoc mode**:
@@ -41,6 +42,10 @@ Only relevant when running in **server mode** AND **LDAP server** is active:
 - `ldap_port`: Port to listen on for the LDAP server (when running as a server AND LDAP server is on as well). Default: `3890`
 - `ldap_user`: Username to provide to connect to the LDAP server. Default: `aredn`
 - `ldap_pwd`: Password to provide to connect to the LDAP server. Default: `aredn`
+
+Only relevant when running in **server mode** AND **SIP server** is active:
+
+- `sip_port`: Port to listen on for the SIP server (when running as a server AND SIP server is on as well). Default: `5060`
 
 ## Examples
 

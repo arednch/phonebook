@@ -2,6 +2,9 @@
 
 Phonebook conversion from CSV to a number of output formats intended to be used for AREDN.
 
+For release notes, see the [release page](https://github.com/arednch/packages/releases) or
+[this document](https://docs.google.com/document/d/18D14Ch3GjUZmSRQALEKslvtEJ0O76pZkV3VNJ6vsB14/edit).
+
 ## Flags
 
 Generally applicable:

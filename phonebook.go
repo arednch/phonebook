@@ -316,7 +316,8 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 	}
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
 	http.HandleFunc("/reload", srv.ReloadPhonebook)
-	http.HandleFunc("/config", srv.UpdateConfig)
+	http.HandleFunc("/showconfig", srv.ShowConfig)
+	http.HandleFunc("/updateconfig", srv.UpdateConfig)
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		return err

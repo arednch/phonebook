@@ -51,11 +51,22 @@ func ReadFromJSON(path string) (*Config, error) {
 	return &conf, nil
 }
 
-func WriteToJSON(conf *Config, path string) error {
-	data, err := json.MarshalIndent(conf, "", "  ")
+func ConvertToJSON(conf Config, censorSensitive bool) ([]byte, error) {
+	if censorSensitive {
+		conf.LDAPPwd = "***"
+	}
+	data, err := json.MarshalIndent(&conf, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func WriteToJSON(conf *Config, path string, censorSensitive bool) error {
+	data, err := ConvertToJSON(*conf, censorSensitive)
 	if err != nil {
 		return err
 	}
-
 	return os.WriteFile(path, data, 0644)
 }

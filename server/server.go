@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -23,7 +22,23 @@ type Server struct {
 	ReloadFn ReloadFunc
 }
 
+func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
+	config, err := configuration.ConvertToJSON(*s.Config, true)
+	if err != nil {
+		if s.Config.Debug {
+			fmt.Printf("/showconfig: unable to convert config: %s\n", err)
+		}
+		http.Error(w, "unable to convert config", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(config)
+}
+
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var changed bool
 	var cfg *configuration.Config
 	if s.ConfigPath == "" {
 		fmt.Fprintln(w, "phonebook was not started with a config path set ('-conf' flag) so config file won't be updated")
@@ -31,7 +46,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		var err error
 		if cfg, err = configuration.ReadFromJSON(s.ConfigPath); err != nil {
 			if s.Config.Debug {
-				fmt.Printf("/config: unable to read config: %s\n", err)
+				fmt.Printf("/updateconfig: unable to read config: %s\n", err)
 			}
 			http.Error(w, "unable to read config", http.StatusInternalServerError)
 			return
@@ -39,19 +54,31 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "phonebook config changes will be reflected in", s.ConfigPath)
 	}
 
+	// Check for supported fields to update.
 	src := r.FormValue("source")
 	if src != "" {
+		changed = true
 		s.Config.Source = src
-		fmt.Fprintf(w, "- source now set (but not validated!): %q\n", src)
+		fmt.Fprintf(w, "- \"source\" now set (but not validated!): %q\n", src)
 		if s.Config.Debug {
-			fmt.Printf("/config: source now set (but not validated): %q\n", src)
+			fmt.Printf("/updateconfig: \"source\" now set (but not validated): %q\n", src)
 		}
 	}
 
+	// Exit early if we didn't make any changes (avoid unnecessary disk writes etc).
+	if !changed {
+		fmt.Fprintln(w, "no changes were made")
+		if s.Config.Debug {
+			fmt.Println("/updateconfig: no changes were made")
+		}
+		return
+	}
+
+	// Finally writing the changes if there are any.
 	if cfg != nil {
-		if err := configuration.WriteToJSON(cfg, s.ConfigPath); err != nil {
+		if err := configuration.WriteToJSON(cfg, s.ConfigPath, false); err != nil {
 			if s.Config.Debug {
-				fmt.Printf("/config: unable to write config: %s\n", err)
+				fmt.Printf("/updateconfig: unable to write config: %s\n", err)
 			}
 			http.Error(w, "unable to write config", http.StatusInternalServerError)
 			return
@@ -59,12 +86,12 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Fprintf(w, "phonebook config updated in %q\n", s.ConfigPath)
 		if s.Config.Debug {
-			fmt.Printf("/config: phonebook config updated in %q\n", s.ConfigPath)
+			fmt.Printf("/updateconfig: phonebook config updated in %q\n", s.ConfigPath)
 		}
 	} else {
 		fmt.Fprintln(w, "only phonebook runtime (!) config updated")
 		if s.Config.Debug {
-			fmt.Println("/config: only phonebook runtime (!) config updated")
+			fmt.Println("/updateconfig: only phonebook runtime (!) config updated")
 		}
 	}
 }
@@ -152,5 +179,6 @@ func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	io.WriteString(w, string(body))
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
 }

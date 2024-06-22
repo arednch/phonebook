@@ -68,6 +68,11 @@ var (
 	extensions = map[string]string{
 		"vcard": ".vcf",
 	}
+	ignoredIdentityPfxs = []string{
+		"127.0.0.",
+		"fe80::",
+		"::1",
+	}
 )
 
 func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
@@ -177,6 +182,54 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 	return nil
 }
 
+func ignoreIdentityPfx(id string) bool {
+	for _, pfx := range ignoredIdentityPfxs {
+		if strings.HasPrefix(id, pfx) {
+			return true
+		}
+	}
+	return false
+}
+
+func getLocalIdentities() (map[string]bool, error) {
+	identities := map[string]bool{
+		"localnode.local.mesh": true, // AREDN default for local node
+	}
+
+	if hn, err := os.Hostname(); err != nil {
+		return nil, fmt.Errorf("unable to look up hostname: %s", err)
+	} else {
+		if !ignoreIdentityPfx(hn) {
+			identities[hn] = true
+		}
+	}
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("unable to look up interfaces: %s", err)
+	}
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			return nil, fmt.Errorf("unable to look up addresses for interface %s: %s", i.Name, err)
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if !ignoreIdentityPfx(ip.String()) {
+				identities[ip.String()] = true
+			}
+		}
+	}
+
+	return identities, nil
+}
+
 func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) error {
 	if cfg.Source == "" {
 		return errors.New("source needs to be set")
@@ -212,16 +265,28 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 			return fmt.Errorf("unable to create SIP server: %s", err)
 		}
 
-		s := &sip.Server{
-			Config:  cfg,
-			Records: records,
-			UA:      ua,
-			Srv:     srv,
+		identities, err := getLocalIdentities()
+		if err != nil {
+			identities = nil
+			if cfg.Debug {
+				fmt.Printf("unable to look up local identities, using empty set: %s\n", err)
+			}
+		} else if cfg.Debug {
+			fmt.Println("using local SIP identities:")
+			for k := range identities {
+				fmt.Printf("  - %s\n", k)
+			}
 		}
-		srv.OnRegister(s.OnRegister)
-		srv.OnInvite(s.OnInvite)
-		srv.OnBye(s.OnBye)
-		srv.OnAck(s.OnAck)
+		s := &sip.Server{
+			Config:          cfg,
+			Records:         records,
+			UA:              ua,
+			Srv:             srv,
+			LocalIdentities: identities,
+		}
+		srv.OnRegister(s.OnRegister) // A phone wants to register with this SIP server.
+		srv.OnInvite(s.OnInvite)     // A phone wants to place a call.
+		srv.OnBye(s.OnBye)           // A phone wants to end a call.
 
 		go func() {
 			fmt.Println("Starting SIP Listener")

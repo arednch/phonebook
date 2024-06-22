@@ -38,11 +38,20 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var permanent bool
+	perm := r.FormValue("perm")
+	if strings.ToLower(strings.TrimSpace(perm)) == "true" {
+		permanent = true
+	}
+
 	var changed bool
 	var cfg *configuration.Config
-	if s.ConfigPath == "" {
+	switch {
+	case s.ConfigPath == "":
 		fmt.Fprintln(w, "phonebook was not started with a config path set ('-conf' flag) so config file won't be updated")
-	} else {
+	case !permanent:
+		fmt.Fprintln(w, "phonebook config changes are not going to be written to disk")
+	default:
 		var err error
 		if cfg, err = configuration.ReadFromJSON(s.ConfigPath); err != nil {
 			if s.Config.Debug {
@@ -59,6 +68,9 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if src != "" {
 		changed = true
 		s.Config.Source = src
+		if cfg != nil {
+			cfg.Source = src
+		}
 		fmt.Fprintf(w, "- \"source\" now set (but not validated!): %q\n", src)
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"source\" now set (but not validated): %q\n", src)

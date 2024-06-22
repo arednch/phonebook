@@ -30,14 +30,16 @@ import (
 
 var (
 	// Generally applicable flags.
-	conf       = flag.String("conf", "", "OpenWRT UCI tree path to read config from instead of parsing flags.")
-	source     = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
-	olsrFile   = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
-	sysInfoURL = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
-	daemonize  = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
-	ldapServer = flag.Bool("ldap_server", false, "Phonebook also runs an LDAP server when in server mode.")
-	sipServer  = flag.Bool("sip_server", false, "Phonebook also runs a SIP server when in server mode.")
-	debug      = flag.Bool("debug", false, "Turns on verbose logging to stdout when set to true.")
+	conf            = flag.String("conf", "", "OpenWRT UCI tree path to read config from instead of parsing flags.")
+	source          = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
+	olsrFile        = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
+	sysInfoURL      = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
+	daemonize       = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
+	ldapServer      = flag.Bool("ldap_server", false, "Phonebook also runs an LDAP server when in server mode.")
+	sipServer       = flag.Bool("sip_server", false, "Phonebook also runs a SIP server when in server mode.")
+	debug           = flag.Bool("debug", false, "Turns on verbose logging to stdout when set to true.")
+	allowRtCfgChg   = flag.Bool("allow_runtime_config_changes", false, "Allows runtime config changes via web server when set to true.")
+	allowPermCfgChg = flag.Bool("allow_permanent_config_changes", false, "Allows permanent config changes via web server when set to true.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
@@ -364,26 +366,28 @@ func main() {
 		}
 	} else {
 		cfg = &configuration.Config{
-			Source:         *source,
-			OLSRFile:       *olsrFile,
-			SysInfoURL:     *sysInfoURL,
-			Server:         *daemonize,
-			LDAPServer:     *ldapServer,
-			SIPServer:      *sipServer,
-			Debug:          *debug,
-			Path:           *path,
-			Formats:        strings.Split(*formats, ","),
-			Targets:        strings.Split(*targets, ","),
-			Resolve:        *resolve,
-			IndicateActive: *indicateActive,
-			FilterInactive: *filterInactive,
-			ActivePfx:      *activePfx,
-			Port:           *port,
-			Reload:         *reload,
-			LDAPPort:       *ldapPort,
-			LDAPUser:       *ldapUser,
-			LDAPPwd:        *ldapPwd,
-			SIPPort:        *sipPort,
+			Source:                      *source,
+			OLSRFile:                    *olsrFile,
+			SysInfoURL:                  *sysInfoURL,
+			Server:                      *daemonize,
+			LDAPServer:                  *ldapServer,
+			SIPServer:                   *sipServer,
+			Debug:                       *debug,
+			AllowRuntimeConfigChanges:   *allowRtCfgChg,
+			AllowPermanentConfigChanges: *allowPermCfgChg,
+			Path:                        *path,
+			Formats:                     strings.Split(*formats, ","),
+			Targets:                     strings.Split(*targets, ","),
+			Resolve:                     *resolve,
+			IndicateActive:              *indicateActive,
+			FilterInactive:              *filterInactive,
+			ActivePfx:                   *activePfx,
+			Port:                        *port,
+			Reload:                      *reload,
+			LDAPPort:                    *ldapPort,
+			LDAPUser:                    *ldapUser,
+			LDAPPwd:                     *ldapPwd,
+			SIPPort:                     *sipPort,
 		}
 	}
 	// Detect when flag is set to run as a server even when reading config.

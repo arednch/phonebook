@@ -11,13 +11,15 @@ import (
 
 type Config struct {
 	// Generally applicable.
-	Source     string `json:"source"`
-	OLSRFile   string `json:"olsr_file"`
-	SysInfoURL string `json:"sysinfo_url"`
-	Server     bool   `json:"server,omitempty"`
-	LDAPServer bool   `json:"ldap_server"`
-	SIPServer  bool   `json:"sip_server"`
-	Debug      bool   `json:"debug"`
+	Source                      string `json:"source"`
+	OLSRFile                    string `json:"olsr_file"`
+	SysInfoURL                  string `json:"sysinfo_url"`
+	Server                      bool   `json:"server,omitempty"`
+	LDAPServer                  bool   `json:"ldap_server"`
+	SIPServer                   bool   `json:"sip_server"`
+	Debug                       bool   `json:"debug"`
+	AllowRuntimeConfigChanges   bool   `json:"allow_runtime_config_changes"`
+	AllowPermanentConfigChanges bool   `json:"allow_permanent_config_changes"`
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	Path           string   `json:"path"`

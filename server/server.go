@@ -87,11 +87,26 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.Config.AllowRuntimeConfigChanges {
+		if s.Config.Debug {
+			fmt.Println("/updateconfig: updating config is not allowed by config")
+		}
+		http.Error(w, "updating config is not allowed by config (-allow_runtime_config_changes)", http.StatusInternalServerError)
+		return
+	}
+
 	var permanent bool
 	perm := r.FormValue("perm")
 	perm = strings.ToLower(strings.TrimSpace(perm))
 	if perm == "true" {
 		permanent = true
+	}
+	if permanent && !s.Config.AllowPermanentConfigChanges {
+		if s.Config.Debug {
+			fmt.Println("/updateconfig: updating config on disk is not allowed by config")
+		}
+		http.Error(w, "updating config on disk is not allowed by config (-allow_permanent_config_changes)", http.StatusInternalServerError)
+		return
 	}
 
 	var changed bool

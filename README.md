@@ -16,6 +16,8 @@ Generally applicable:
 - `ldap_server`: When the phonebook is running as a server, it also exposes an LDAP v3 server when set to true. Default: false
 - `sip_server`: When the phonebook is running as a server, it also runs a _very_ simple SIP server when set to true. Default: false
 - `debug`: Print verbose debug messages on stdout when set to true. Default: false
+- `allow_runtime_config_changes`: Allows runtime config changes via web server when set to true.
+- `allow_permanent_config_changes`: Allows permanent config changes via web server when set to true.
 
 Only relevant when running in **non-server / ad-hoc mode**:
 
@@ -136,6 +138,8 @@ A typical file would look like this:
 	"ldap_server": true,
 	"sip_server": true,
 	"debug": false,
+  "allow_config_changes": false,
+	"allow_permanent_config_changes", false,
 	"path": "/www/arednstack",
 	"formats": [
 		"combined",

@@ -287,6 +287,8 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 		srv.OnRegister(s.OnRegister) // A phone wants to register with this SIP server.
 		srv.OnInvite(s.OnInvite)     // A phone wants to place a call.
 		srv.OnBye(s.OnBye)           // A phone wants to end a call.
+		srv.OnAck(s.OnAck)
+		srv.OnPublish(s.OnPublish)
 
 		go func() {
 			fmt.Println("Starting SIP Listener")

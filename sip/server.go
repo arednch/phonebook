@@ -25,17 +25,17 @@ type Server struct {
 
 func (s *Server) OnRegister(req *sip.Request, tx sip.ServerTransaction) {
 	if s.Config.Debug {
-		fmt.Printf("SIP/Register: received REGISTER message from %s\n", req.Source())
+		fmt.Printf("SIP/REGISTER: received REGISTER message from %s\n", req.Source())
 	}
 	// Respond with OK in all cases. No credentials are checked.
 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-		fmt.Printf("SIP/Register: error sending response: %s\n", err)
+		fmt.Printf("SIP/REGISTER: error sending response: %s\n", err)
 	}
 }
 
 func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 	if s.Config.Debug {
-		fmt.Printf("SIP/Invite: received INVITE message from %q to %q\n", req.From(), req.To())
+		fmt.Printf("SIP/INVITE: received INVITE message from %q to %q\n", req.From(), req.To())
 	}
 
 	// Check if this is a call directed at a local identity (hostname or IP). If not, ignore it.
@@ -43,7 +43,7 @@ func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 	if s.LocalIdentities != nil {
 		if local, ok := s.LocalIdentities[req.To().Address.Host]; !ok || !local {
 			if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusNotFound, "Not Found", nil)); err != nil {
-				fmt.Printf("SIP/Invite: error sending response: %s\n", err)
+				fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
 			}
 			return
 		}
@@ -83,25 +83,34 @@ func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 
 	if redirect != nil {
 		resp := sip.NewResponseFromRequest(req, sip.StatusMovedTemporarily, "Moved Temporarily", nil)
-		// resp.RemoveHeader("Via")
 		resp.AppendHeaderAfter(&sip.ContactHeader{
-			DisplayName: "AREDN Direct IP Call Transfer",
+			DisplayName: redirect.User,
 			Address:     *redirect,
 		}, "To")
+		resp.AppendHeaderAfter(sip.NewHeader("Diversion", fmt.Sprintf("\"%s\" <%s>;reason=unconditional", redirect.User, redirect.String())), "To")
 		if err := tx.Respond(resp); err != nil {
-			fmt.Printf("SIP/Invite: error sending response: %s\n", err)
+			fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
 		}
 		return
 	}
 
 	// As a last resort, we're giving up and tell the client that we can't route that call.
 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusNotFound, "Not Found", nil)); err != nil {
-		fmt.Printf("SIP/Invite: error sending response: %s\n", err)
+		fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
 	}
+}
+
+func (s *Server) OnAck(req *sip.Request, tx sip.ServerTransaction) {
 }
 
 func (s *Server) OnBye(req *sip.Request, tx sip.ServerTransaction) {
 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-		fmt.Printf("SIP/Bye: error sending response: %s\n", err)
+		fmt.Printf("SIP/BYE: error sending response: %s\n", err)
+	}
+}
+
+func (s *Server) OnPublish(req *sip.Request, tx sip.ServerTransaction) {
+	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
+		fmt.Printf("SIP/PUBLISH: error sending response: %s\n", err)
 	}
 }

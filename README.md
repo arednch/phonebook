@@ -134,6 +134,7 @@ A typical file would look like this:
 	"olsr_file": "/tmp/run/hosts_olsr",
 	"sysinfo_url": "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1",
 	"ldap_server": true,
+	"sip_server": true,
 	"debug": false,
 	"path": "/www/arednstack",
 	"formats": [
@@ -152,25 +153,86 @@ A typical file would look like this:
 	"reload_seconds": 3600,
 	"ldap_port": 3890,
 	"ldap_user": "aredn",
-	"ldap_pwd": "aredn"
+	"ldap_pwd": "aredn",
+	"sip_port": 5060
 }
 ```
 
 The config allows to set the same paramaters as the flags (modulo the `conf` flag).
 
-### Queries
+### Web Service
 
-The server can then be queried as follows (replace "server" and "port" accordingly):
+The phonebook exposes a web interface when run as a service. This chapter elaborates on
+the exposed end points.
 
-http://server:port/phonebook?target=generic&format=combined
+Note: We assume the standard AREDN setup and thus use "localnode.local.mesh" as the
+host and "8081" as the port. Adjust it as needed if you are using it in another configuration.
 
-The same formats and targets as if run from the commandline are supported.
+#### /phonebook
 
-Additionally, the following parameters are supported:
+This endpoint is the primary one and generates a phonebook ad-hoc in the requested format.
+It's primarily intended to be used directly by the phone as the URL to load the phonebook from.
+
+Example: http://localnode.local.mesh:8081/phonebook?target=generic&format=combined&ia=true
+
+Required parameters:
+
+- `format`: Single value specifying the format (e.g. "combined"). See [flags](#flags) for more details.
+
+- `target`: Single value specifying the target (e.g. "generic"). See [flags](#flags) for more details.
+
+Optional parameters:
 
 - `resolve`: Set to `true` in order to attempt to resolve hostnames to IPs for phones based on OLSR data (this assumes that the data is available.)
+
 - `ia`: Set to `true` in order to indicate active phones (i.e. there's a route) in the directory.
+
 - `fi`: Set to `true` in order to filter the directory to just the active phones.
+
+#### /reload
+
+This endpoint forces the phonebook server to attempt to reload the upstream phonebook (CSV) from whatever source is configured (usually a local file on disk updated by a cron job).
+
+Example: http://localnode.local.mesh:8081/reload
+
+Required parameters:
+
+- n/a
+
+Optional parameters:
+
+- n/a
+
+#### /showconfig
+
+This endpoint returns the currently loaded phonebook configuration in JSON format.
+It's primarily intended for (local or remote) debugging purposes.
+
+Example: http://localnode.local.mesh:8081/showconfig
+
+Required parameters:
+
+- n/a
+
+Optional parameters:
+
+- n/a
+
+#### /updateconfig
+
+This endpoint allows to update a limited set of configuration settings.
+
+Example: http://localnode.local.mesh:8081/updateconfig?source=http://hb9edi-vm-gw.local.mesh/filerepo/Phonebook/AREDN_Phonebook.csv
+
+Required parameters:
+
+- n/a
+
+Optional parameters:
+
+- `perm`: When set to `true`, instructs the phonebook server to write the config to disk as well. If not set, changes are only made to the running service. When the service restarts (e.g. when the Node reboots), the config is read from disk again.
+
+- `source`: Defines the source URL to load the upstream phonebook from (CSV). See [flags](#flags) for more details.
 
 ## Supported Devices
 

@@ -23,24 +23,74 @@ type Server struct {
 }
 
 func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
-	config, err := configuration.ConvertToJSON(*s.Config, true)
-	if err != nil {
+	t := r.FormValue("type")
+	t = strings.ToLower(strings.TrimSpace(t))
+	if t == "" {
 		if s.Config.Debug {
-			fmt.Printf("/showconfig: unable to convert config: %s\n", err)
+			fmt.Printf("/showconfig: 'type' not specified: %+v\n", r)
 		}
-		http.Error(w, "unable to convert config", http.StatusInternalServerError)
+		http.Error(w, "'type' must be specified: [disk,runtime,diff]", http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	var cfg *configuration.Config
+	switch {
+	case t == "d" || t == "disk" || t == "diff":
+		if s.ConfigPath == "" {
+			http.Error(w, "phonebook was not started with a config path set ('-conf' flag) so config file can't be loaded", http.StatusInternalServerError)
+			return
+		}
+		var err error
+		if cfg, err = configuration.ReadFromJSON(s.ConfigPath); err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/showconfig: unable to read config: %s\n", err)
+			}
+			http.Error(w, "unable to read config", http.StatusInternalServerError)
+			return
+		}
+	case t == "r" || t == "runtime":
+		cfg = s.Config
+	default:
+		if s.Config.Debug {
+			fmt.Printf("/showconfig: 'type' %q not as expected: %+v\n", t, r)
+		}
+		http.Error(w, "'type' must be specified: [disk,runtime]", http.StatusBadRequest)
+		return
+	}
+
+	if t != "diff" {
+		config, err := configuration.ConvertToJSON(*cfg, true)
+		if err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/showconfig: unable to convert config: %s\n", err)
+			}
+			http.Error(w, "unable to convert config", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(config)
+		return
+	}
+
+	diffs, err := s.Config.Diff(cfg)
+	if err != nil {
+		if s.Config.Debug {
+			fmt.Printf("/showconfig: unable to diff configs: %s\n", err)
+		}
+		http.Error(w, "unable to diff config", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
-	w.Write(config)
+	w.Write([]byte(diffs))
 }
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var permanent bool
 	perm := r.FormValue("perm")
-	if strings.ToLower(strings.TrimSpace(perm)) == "true" {
+	perm = strings.ToLower(strings.TrimSpace(perm))
+	if perm == "true" {
 		permanent = true
 	}
 
@@ -65,6 +115,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Check for supported fields to update.
 	src := r.FormValue("source")
+	src = strings.ToLower(strings.TrimSpace(src))
 	if src != "" {
 		changed = true
 		s.Config.Source = src
@@ -124,6 +175,7 @@ func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 	f := r.FormValue("format")
+	f = strings.ToLower(strings.TrimSpace(f))
 	if f == "" {
 		if s.Config.Debug {
 			fmt.Printf("/phonebook: 'format' not specified: %+v\n", r)
@@ -132,7 +184,7 @@ func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var format exporter.Format
-	switch strings.ToLower(strings.TrimSpace(f)) {
+	switch f {
 	case "d", "direct":
 		format = exporter.FormatDirect
 	case "p", "pbx":
@@ -148,15 +200,15 @@ func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	target := r.FormValue("target")
+	target = strings.ToLower(strings.TrimSpace(target))
 	if target == "" {
 		if s.Config.Debug {
 			fmt.Printf("/phonebook: 'target' not specified: %+v\n", r)
 		}
-		http.Error(w, "'target' must be specified: [generic,cisco,snom,yealink,grandstream]", http.StatusBadRequest)
+		http.Error(w, "'target' must be specified: [generic,cisco,snom,yealink,grandstream,vcard]", http.StatusBadRequest)
 		return
 	}
-	outTgt := strings.ToLower(strings.TrimSpace(target))
-	exp, ok := s.Exporters[outTgt]
+	exp, ok := s.Exporters[target]
 	if !ok {
 		if s.Config.Debug {
 			fmt.Printf("/phonebook: 'target' %q unknown: %+v\n", target, r)
@@ -167,19 +219,22 @@ func (s *Server) ServePhonebook(w http.ResponseWriter, r *http.Request) {
 
 	var resolve bool
 	res := r.FormValue("resolve")
-	if strings.ToLower(strings.TrimSpace(res)) == "true" {
+	res = strings.ToLower(strings.TrimSpace(res))
+	if res == "true" {
 		resolve = true
 	}
 
 	var indicateActive bool
 	ia := r.FormValue("ia")
-	if strings.ToLower(strings.TrimSpace(ia)) == "true" {
+	ia = strings.ToLower(strings.TrimSpace(ia))
+	if ia == "true" {
 		indicateActive = true
 	}
 
 	var filterInactive bool
 	fi := r.FormValue("fi")
-	if strings.ToLower(strings.TrimSpace(fi)) == "true" {
+	fi = strings.ToLower(strings.TrimSpace(fi))
+	if fi == "true" {
 		filterInactive = true
 	}
 

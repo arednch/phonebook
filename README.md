@@ -206,13 +206,17 @@ Optional parameters:
 #### /showconfig
 
 This endpoint returns the currently loaded phonebook configuration in JSON format.
-It's primarily intended for (local or remote) debugging purposes.
+It's primarily intended for (local or remote) debugging purposes. Some fields may be censored (e.g. passwords).
 
-Example: http://localnode.local.mesh:8081/showconfig
+Example: http://localnode.local.mesh:8081/showconfig?type=r
 
 Required parameters:
 
-- n/a
+- `type`: The type of the config needs to be set and can be either one of the following:
+
+		- `disk` (alias `d`): The config from disk is loaded and displayed.
+		- `runtime` (alias `r`): The runtime config is displayed.
+		- `diff`: The config from disk is loaded and compared to the runtime config and a human readable diff between the two is displayed.
 
 Optional parameters:
 

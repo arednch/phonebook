@@ -2,8 +2,11 @@ package configuration
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type Config struct {
@@ -35,6 +38,20 @@ type Config struct {
 	LDAPPwd  string `json:"ldap_pwd"`
 	// Only relevant when SIP server is on.
 	SIPPort int `json:"sip_port"`
+}
+
+func (c *Config) Diff(other *Config) (string, error) {
+	c1, err := ConvertToJSON(*c, true)
+	if err != nil {
+		return "", fmt.Errorf("error converting config (self): %s", err)
+	}
+
+	c2, err := ConvertToJSON(*other, true)
+	if err != nil {
+		return "", fmt.Errorf("error converting config (other): %s", err)
+	}
+
+	return cmp.Diff(string(c1), string(c2)), nil
 }
 
 func ReadFromJSON(path string) (*Config, error) {

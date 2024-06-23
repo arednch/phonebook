@@ -266,6 +266,10 @@ Optional parameters:
 
 - `debug`: Defines the debug output flag (set to "true" or "false"). See [flags](#flags) for more details.
 
+- `webuser`: Defines the user required to authenticate via basicAuth for most web endpoints. See [flags](#flags) for more details.
+
+- `webpwd`: Defines the password required to authenticate via basicAuth for most web endpoints. See [flags](#flags) for more details.
+
 ## Supported Devices
 
 Note: The following list is not complete. It will work with many more devices. This is the list of "confirmed tested" devices at some point in time (not with every release!). If you have other devices that work, please let us know.

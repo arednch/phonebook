@@ -199,6 +199,12 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	webuser := r.FormValue("webuser")
+	webuser = strings.TrimSpace(webuser)
+
+	webpwd := r.FormValue("webpwd")
+	webpwd = strings.TrimSpace(webpwd)
+
 	// Update supported fields (assume fields are validated by now).
 	if src != "" {
 		changed = true
@@ -242,6 +248,32 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "- \"debug\" now set to %t\n", debug)
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"debug\" now set to %t\n", debug)
+		}
+	}
+
+	if webuser != "" {
+		changed = true
+		s.Config.WebUser = webuser
+		if cfg != nil {
+			cfg.WebUser = webuser
+		}
+
+		fmt.Fprintf(w, "- \"web_user\" now set to %q\n", webuser)
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: \"web_user\" now set to %q\n", webuser)
+		}
+	}
+
+	if webpwd != "" {
+		changed = true
+		s.Config.WebPwd = webpwd
+		if cfg != nil {
+			cfg.WebPwd = webpwd
+		}
+
+		fmt.Fprintf(w, "- \"web_pwd\" now set\n")
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: \"web_pwd\" now set\n")
 		}
 	}
 

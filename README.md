@@ -242,6 +242,12 @@ Optional parameters:
 
 - `source`: Defines the source URL to load the upstream phonebook from (CSV). See [flags](#flags) for more details.
 
+- `reload`: Defines the amount of time to wait between reloading the phonebook data from the specified source. See [flags](#flags) for more details.
+
+		Important: Be careful with updating this as it may overload upstream servers (depending on what the "source" is set to). The default value has been chosen specifically with that in mind.
+
+- `debug`: Defines the debug output flag (set to "true" or "false"). See [flags](#flags) for more details.
+
 ## Supported Devices
 
 Note: The following list is not complete. It will work with many more devices. This is the list of "confirmed tested" devices at some point in time (not with every release!). If you have other devices that work, please let us know.

@@ -401,6 +401,16 @@ func main() {
 	}
 
 	if cfg.Server {
+		// Validation only relevant for server.
+		if cfg.Reload.Seconds() < configuration.MinimalReloadSeconds {
+			fmt.Printf("reload config/flag too low (<%d): %d\n", configuration.MinimalReloadSeconds, int(cfg.Reload.Seconds()))
+			os.Exit(1)
+		}
+		if cfg.Reload.Seconds() > configuration.MaxReloadSeconds {
+			fmt.Printf("reload config/flag too high (>%d): %d\n", configuration.MaxReloadSeconds, int(cfg.Reload.Seconds()))
+			os.Exit(1)
+		}
+
 		if *debug {
 			fmt.Println("Running phonebook in server mode")
 		}

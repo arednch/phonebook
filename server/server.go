@@ -3,7 +3,9 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
@@ -132,6 +134,28 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	src := r.FormValue("source")
 	src = strings.TrimSpace(src)
 
+	var reload int
+	rs := r.FormValue("reload")
+	rs = strings.TrimSpace(rs)
+	if rs != "" {
+		var err error
+		reload, err = strconv.Atoi(rs)
+		if err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/updateconfig: invalid reload value: %s\n", rs)
+			}
+			http.Error(w, "invalid reload value", http.StatusInternalServerError)
+			return
+		}
+		if reload < configuration.MinimalReloadSeconds || reload > configuration.MaxReloadSeconds {
+			if s.Config.Debug {
+				fmt.Printf("/updateconfig: reload value too high or low (<%d or >%d): %s\n", configuration.MinimalReloadSeconds, configuration.MaxReloadSeconds, rs)
+			}
+			http.Error(w, "reload value too high or low", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	dbg := r.FormValue("debug")
 	dbg = strings.ToLower(strings.TrimSpace(dbg))
 	if dbg != "" && dbg != "true" && dbg != "false" {
@@ -152,6 +176,21 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "- \"source\" now set (but not validated!): %q\n", src)
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"source\" now set (but not validated): %q\n", src)
+		}
+	}
+
+	if rs != "" {
+		changed = true
+		rd := time.Duration(reload) * time.Second
+		s.Config.ReloadSeconds = reload
+		s.Config.Reload = rd
+		if cfg != nil {
+			cfg.ReloadSeconds = reload
+			cfg.Reload = rd
+		}
+		fmt.Fprintf(w, "- reload duration now set to %d seconds (%s)\n", reload, rd)
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: reload duration now set to %d seconds (%s)\n", reload, rd)
 		}
 	}
 

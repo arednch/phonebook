@@ -9,6 +9,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+const (
+	MinimalReloadSeconds = 60               // one minute
+	MaxReloadSeconds     = 2 * 24 * 60 * 60 // two days
+)
+
 type Config struct {
 	// Generally applicable.
 	Source                      string `json:"source"`

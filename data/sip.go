@@ -83,32 +83,29 @@ func NewSIPResponseFromRequest(req *SIPRequest, statusCode int, statusMsg string
 		StatusMessage: statusMsg,
 	}
 
-	for _, hdr := range req.Headers {
-		switch hdr.Name {
-		case "Record-Route":
-			fallthrough
-		case "Via":
-			fallthrough
-		case "From":
-			fallthrough
-		case "To":
-			fallthrough
-		case "Call-ID":
-			fallthrough
-		case "CSeq":
-			h := hdr.Clone()
-			resp.Headers = append(resp.Headers, &h)
-		case "Timestamp":
-			if statusCode == 100 {
-				h := hdr.Clone()
-				resp.Headers = append(resp.Headers, &h)
-			}
-		default:
-			continue
-		}
+	copyHeader("Record-Route", req, resp)
+	copyHeader("Via", req, resp)
+	copyHeader("From", req, resp)
+	copyHeader("To", req, resp)
+	copyHeader("Call-ID", req, resp)
+	copyHeader("CSeq", req, resp)
+	if statusCode == 100 {
+		copyHeader("Timestamp", req, resp)
 	}
 
 	return resp
+}
+
+func copyHeader(name string, req *SIPRequest, resp *SIPResponse) {
+	name = strings.ToLower(name)
+	for _, h := range req.Headers {
+		if name != strings.ToLower(h.Name) {
+			continue
+		}
+		hdr := h.Clone()
+		resp.Headers = append(resp.Headers, &hdr)
+		break
+	}
 }
 
 type SIPResponse struct {
@@ -117,12 +114,11 @@ type SIPResponse struct {
 	StatusMessage string
 	Headers       []*SIPHeader
 
-	// Not implemented at least for now.
-	// Body []byte
+	Body string
 }
 
-func (r *SIPResponse) Serialize() string {
-	buf := strings.Builder{}
+func (r *SIPResponse) Serialize() []byte {
+	buf := bytes.Buffer{}
 
 	// Status line
 	buf.WriteString(r.SIPVersion)
@@ -130,20 +126,24 @@ func (r *SIPResponse) Serialize() string {
 	buf.WriteString(strconv.Itoa(r.StatusCode))
 	buf.WriteString(" ")
 	buf.WriteString(r.StatusMessage)
-	buf.WriteString("\n")
+	buf.WriteString("\r\n")
 
 	// Headers
 	for _, hdr := range r.Headers {
 		buf.WriteString(hdr.serialize())
-		buf.WriteString("\n")
+		buf.WriteString("\r\n")
 	}
+	buf.WriteString("Content-Length: 0\r\n")
 
-	buf.WriteString("\n")
+	// Empty line
+	buf.WriteString("\r\n")
 
 	// Body
-	// Not implemented yet.
+	if r.Body != "" {
+		buf.WriteString(r.Body)
+	}
 
-	return buf.String()
+	return buf.Bytes()
 }
 
 type SIPHeader struct {

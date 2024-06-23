@@ -42,18 +42,27 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 			if err != nil {
 				return
 			}
-			buf = []byte(resp.Serialize())
-			// fmt.Printf("%s\n", string(buf))
-			pc.WriteTo(buf, addr)
+			if resp == nil {
+				return
+			}
+
+			pc.WriteTo(resp.Serialize(), addr)
 		}(pc, addr, buf[:n])
 	}
 }
 
 func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) {
 	var resp *data.SIPResponse
+
 	switch req.Method {
 	case "REGISTER":
 		return s.handleRegister(req)
+	case "INVITE":
+		return s.handleInvite(req)
+	case "ACK":
+		return s.handleAck(req)
+	case "BYE":
+		return s.handleBye(req)
 	default:
 		resp = data.NewSIPResponseFromRequest(req, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
@@ -66,15 +75,18 @@ func (s *Server) handleRegister(req *data.SIPRequest) (*data.SIPResponse, error)
 	return resp, nil
 }
 
-// func (s *Server) OnRegister(req *sip.Request, tx sip.ServerTransaction) {
-// 	if s.Config.Debug {
-// 		fmt.Printf("SIP/REGISTER: received REGISTER message from %s\n", req.Source())
-// 	}
-// 	// Respond with OK in all cases. No credentials are checked.
-// 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-// 		fmt.Printf("SIP/REGISTER: error sending response: %s\n", err)
-// 	}
-// }
+func (s *Server) handleAck(_ *data.SIPRequest) (*data.SIPResponse, error) {
+	return nil, nil
+}
+
+func (s *Server) handleBye(req *data.SIPRequest) (*data.SIPResponse, error) {
+	resp := data.NewSIPResponseFromRequest(req, http.StatusOK, "OK")
+	return resp, nil
+}
+
+func (s *Server) handleInvite(_ *data.SIPRequest) (*data.SIPResponse, error) {
+	return nil, nil
+}
 
 // func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 // 	if s.Config.Debug {
@@ -140,20 +152,5 @@ func (s *Server) handleRegister(req *data.SIPRequest) (*data.SIPResponse, error)
 // 	// As a last resort, we're giving up and tell the client that we can't route that call.
 // 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusNotFound, "Not Found", nil)); err != nil {
 // 		fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
-// 	}
-// }
-
-// func (s *Server) OnAck(req *sip.Request, tx sip.ServerTransaction) {
-// }
-
-// func (s *Server) OnBye(req *sip.Request, tx sip.ServerTransaction) {
-// 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-// 		fmt.Printf("SIP/BYE: error sending response: %s\n", err)
-// 	}
-// }
-
-// func (s *Server) OnPublish(req *sip.Request, tx sip.ServerTransaction) {
-// 	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-// 		fmt.Printf("SIP/PUBLISH: error sending response: %s\n", err)
 // 	}
 // }

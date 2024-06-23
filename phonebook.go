@@ -14,9 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emiago/sipgo"
 	"github.com/mark-rushakoff/ldapserver"
-	"github.com/rs/zerolog"
 
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
@@ -264,19 +262,6 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 	}
 
 	if cfg.SIPServer {
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-		if cfg.Debug {
-			zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		}
-		ua, err := sipgo.NewUA()
-		if err != nil {
-			return fmt.Errorf("unable to create SIP user agent: %s", err)
-		}
-		srv, err := sipgo.NewServer(ua)
-		if err != nil {
-			return fmt.Errorf("unable to create SIP server: %s", err)
-		}
-
 		identities, err := getLocalIdentities()
 		if err != nil {
 			identities = nil
@@ -292,19 +277,14 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 		s := &sip.Server{
 			Config:          cfg,
 			Records:         records,
-			UA:              ua,
-			Srv:             srv,
 			LocalIdentities: identities,
 		}
-		srv.OnRegister(s.OnRegister) // A phone wants to register with this SIP server.
-		srv.OnInvite(s.OnInvite)     // A phone wants to place a call.
-		srv.OnBye(s.OnBye)           // A phone wants to end a call.
-		srv.OnAck(s.OnAck)
-		srv.OnPublish(s.OnPublish)
 
 		go func() {
-			fmt.Println("Starting SIP Listener")
-			if err := s.Srv.ListenAndServe(ctx, "udp", fmt.Sprintf(":%d", cfg.SIPPort)); err != nil {
+			if cfg.Debug {
+				fmt.Println("Starting SIP Listener")
+			}
+			if err := s.ListenAndServe(ctx, "udp", fmt.Sprintf(":%d", cfg.SIPPort)); err != nil {
 				fmt.Printf("SIP server failed: %s\n", err)
 			}
 		}()

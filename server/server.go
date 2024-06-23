@@ -130,7 +130,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Check for supported fields to update and verify.
 	src := r.FormValue("source")
-	src = strings.ToLower(strings.TrimSpace(src))
+	src = strings.TrimSpace(src)
 
 	dbg := r.FormValue("debug")
 	dbg = strings.ToLower(strings.TrimSpace(dbg))

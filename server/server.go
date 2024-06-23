@@ -111,6 +111,9 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Legend:\n"))
+	w.Write([]byte("- items in runtime config but not on disk\n"))
+	w.Write([]byte("+ items in disk config but not runtime\n\n"))
 	w.Write([]byte(diffs))
 }
 

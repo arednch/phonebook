@@ -63,6 +63,9 @@ var (
 
 const (
 	defaultExtension = ".xml"
+
+	AREDNDomain    = "local.mesh"
+	AREDNLocalNode = "localnode.local.mesh" // AREDN default for local node
 )
 
 var (
@@ -197,14 +200,18 @@ func ignoreIdentityPfx(id string) bool {
 
 func getLocalIdentities() (map[string]bool, error) {
 	identities := map[string]bool{
-		"localnode.local.mesh": true, // AREDN default for local node
+		AREDNLocalNode: true,
 	}
 
 	if hn, err := os.Hostname(); err != nil {
 		return nil, fmt.Errorf("unable to look up hostname: %s", err)
 	} else {
+		hn = strings.Trim(hn, ".")
 		if !ignoreIdentityPfx(hn) {
 			identities[hn] = true
+			if !strings.HasSuffix(hn, AREDNDomain) {
+				identities[fmt.Sprintf("%s.%s", hn, AREDNDomain)] = true
+			}
 		}
 	}
 

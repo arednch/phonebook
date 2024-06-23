@@ -41,7 +41,7 @@ func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 	// Check if this is a call directed at a local identity (hostname or IP). If not, ignore it.
 	// This also helps reducing retry storms for some clients (e.g. Linphone).
 	if s.LocalIdentities != nil {
-		if local, ok := s.LocalIdentities[req.To().Address.Host]; !ok || !local {
+		if local, ok := s.LocalIdentities[strings.ToLower(req.To().Address.Host)]; !ok || !local {
 			if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusNotFound, "Not Found", nil)); err != nil {
 				fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
 			}

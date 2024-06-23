@@ -206,6 +206,7 @@ func getLocalIdentities() (map[string]bool, error) {
 	if hn, err := os.Hostname(); err != nil {
 		return nil, fmt.Errorf("unable to look up hostname: %s", err)
 	} else {
+		hn = strings.ToLower(hn)
 		hn = strings.Trim(hn, ".")
 		if !ignoreIdentityPfx(hn) {
 			identities[hn] = true

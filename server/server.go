@@ -91,7 +91,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if s.Config.Debug {
 			fmt.Println("/updateconfig: updating config is not allowed by config")
 		}
-		http.Error(w, "updating config is not allowed by config (-allow_runtime_config_changes)", http.StatusInternalServerError)
+		http.Error(w, "updating config is not allowed by config flag (-allow_runtime_config_changes)", http.StatusInternalServerError)
 		return
 	}
 
@@ -105,7 +105,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if s.Config.Debug {
 			fmt.Println("/updateconfig: updating config on disk is not allowed by config")
 		}
-		http.Error(w, "updating config on disk is not allowed by config (-allow_permanent_config_changes)", http.StatusInternalServerError)
+		http.Error(w, "updating config on disk is not allowed by config flag (-allow_permanent_config_changes)", http.StatusInternalServerError)
 		return
 	}
 
@@ -128,9 +128,21 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "phonebook config changes will be reflected in", s.ConfigPath)
 	}
 
-	// Check for supported fields to update.
+	// Check for supported fields to update and verify.
 	src := r.FormValue("source")
 	src = strings.ToLower(strings.TrimSpace(src))
+
+	dbg := r.FormValue("debug")
+	dbg = strings.ToLower(strings.TrimSpace(dbg))
+	if dbg != "" && dbg != "true" && dbg != "false" {
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: invalid debug value: %s\n", dbg)
+		}
+		http.Error(w, "invalid debug value", http.StatusInternalServerError)
+		return
+	}
+
+	// Update supported fields (assume fields are validated by now).
 	if src != "" {
 		changed = true
 		s.Config.Source = src
@@ -140,6 +152,24 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "- \"source\" now set (but not validated!): %q\n", src)
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"source\" now set (but not validated): %q\n", src)
+		}
+	}
+
+	if dbg != "" {
+		debug := false
+		if dbg == "true" {
+			debug = true
+		}
+
+		changed = true
+		s.Config.Debug = debug
+		if cfg != nil {
+			cfg.Debug = debug
+		}
+
+		fmt.Fprintf(w, "- \"debug\" now set to %t\n", debug)
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: \"debug\" now set to %t\n", debug)
 		}
 	}
 

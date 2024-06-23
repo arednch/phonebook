@@ -39,6 +39,8 @@ type Config struct {
 	Port          int           `json:"port"`
 	ReloadSeconds int           `json:"reload_seconds"`
 	Reload        time.Duration `json:"-"`
+	WebUser       string        `json:"web_user"`
+	WebPwd        string        `json:"web_pwd"`
 	// Only relevant when LDAP server is on.
 	LDAPPort int    `json:"ldap_port"`
 	LDAPUser string `json:"ldap_user"`
@@ -78,6 +80,7 @@ func ReadFromJSON(path string) (*Config, error) {
 func ConvertToJSON(conf Config, censorSensitive bool) ([]byte, error) {
 	if censorSensitive {
 		conf.LDAPPwd = "***"
+		conf.WebPwd = "***"
 	}
 	data, err := json.MarshalIndent(&conf, "", "  ")
 	if err != nil {

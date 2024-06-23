@@ -53,6 +53,8 @@ var (
 	// Only relevant when running in server mode.
 	port     = flag.Int("port", 8080, "Port to listen on (when running as a server).")
 	reload   = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
+	webUser  = flag.String("web_user", "", "Username to protect many of the web endpoints with (BasicAuth). Default: None")
+	webPwd   = flag.String("web_pwd", "", "Password to protect many of the web endpoints with (BasicAuth). Default: None")
 	ldapPort = flag.Int("ldap_port", 3890, "Port to listen on for the LDAP server (when running as a server AND LDAP server is on as well).")
 	ldapUser = flag.String("ldap_user", "aredn", "Username to provide to connect to the LDAP server.")
 	ldapPwd  = flag.String("ldap_pwd", "aredn", "Password to provide to connect to the LDAP server.")
@@ -317,9 +319,21 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 		ReloadFn:   refreshRecords,
 	}
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
-	http.HandleFunc("/reload", srv.ReloadPhonebook)
-	http.HandleFunc("/showconfig", srv.ShowConfig)
-	http.HandleFunc("/updateconfig", srv.UpdateConfig)
+	if cfg.WebUser != "" && cfg.WebPwd != "" {
+		if cfg.Debug {
+			fmt.Println("protecting most web endpoints with configured basicAuth user/pwd")
+		}
+		http.HandleFunc("/reload", srv.BasicAuth(srv.ReloadPhonebook))
+		http.HandleFunc("/showconfig", srv.BasicAuth(srv.ShowConfig))
+		http.HandleFunc("/updateconfig", srv.BasicAuth(srv.UpdateConfig))
+	} else {
+		if cfg.Debug {
+			fmt.Println("not protecting any of the web endpoints with basicAuth as not both user/pwd were set")
+		}
+		http.HandleFunc("/reload", srv.ReloadPhonebook)
+		http.HandleFunc("/showconfig", srv.ShowConfig)
+		http.HandleFunc("/updateconfig", srv.UpdateConfig)
+	}
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
 	if err != nil {
 		return err
@@ -384,6 +398,8 @@ func main() {
 			ActivePfx:                   *activePfx,
 			Port:                        *port,
 			Reload:                      *reload,
+			WebUser:                     *webUser,
+			WebPwd:                      *webPwd,
 			LDAPPort:                    *ldapPort,
 			LDAPUser:                    *ldapUser,
 			LDAPPwd:                     *ldapPwd,

@@ -9,6 +9,7 @@ For release notes, see the [release page](https://github.com/arednch/packages/re
 
 Generally applicable:
 
+- `conf`: Config file to read settings from instead of parsing flags. Default: ""
 - `source`: Path or URL to fetch the phonebook CSV from. Default: ""
 - `olsr`: Path to the OLSR hosts file. Default: `/tmp/run/hosts_olsr`
 - `sysinfo`: URL from which to fetch AREDN sysinfo. Usually: `http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1`
@@ -40,7 +41,12 @@ Only relevant when running in **server mode**:
 
 - `port`: Port to listen on (when running as a server). Default: `8080`
 - `reload`: Duration after which to try to reload the phonebook source. Default: `1h`
-- `conf`: Config file to read settings from instead of parsing flags. Default: ""
+- `web_user`: Username to protect many of the web endpoints with (BasicAuth). Default: None
+- `web_pwd`: Password to protect many of the web endpoints with (BasicAuth). Default: None
+
+	Note: Both `web_user` AND `web_pwd` need to be set in order to protect the endpoints.
+
+	Note: See [web service](#web-service) section for a documentation of which endpoints are protected when this is turned on.
 
 Only relevant when running in **server mode** AND **LDAP server** is active:
 
@@ -155,6 +161,8 @@ A typical file would look like this:
 	"active_pfx": "*",
 	"port": 8081,
 	"reload_seconds": 3600,
+	"web_user": "aredn",
+	"web_pwd": "notasecret",
 	"ldap_port": 3890,
 	"ldap_user": "aredn",
 	"ldap_pwd": "aredn",
@@ -172,12 +180,16 @@ the exposed end points.
 Note: We assume the standard AREDN setup and thus use "localnode.local.mesh" as the
 host and "8081" as the port. Adjust it as needed if you are using it in another configuration.
 
+Note: Each endpoint has a `BasicAuth protection` definition. This is a simple statement whether that endpoint needs BasicAuth authentication when `web_user` and `web_pwd` is set (see [flags](#flags) for more details) as well.
+
 #### /phonebook
 
 This endpoint is the primary one and generates a phonebook ad-hoc in the requested format.
 It's primarily intended to be used directly by the phone as the URL to load the phonebook from.
 
 Example: http://localnode.local.mesh:8081/phonebook?target=generic&format=combined&ia=true
+
+BasicAuth protection: No.
 
 Required parameters:
 
@@ -199,6 +211,8 @@ This endpoint forces the phonebook server to attempt to reload the upstream phon
 
 Example: http://localnode.local.mesh:8081/reload
 
+BasicAuth protection: Yes.
+
 Required parameters:
 
 - n/a
@@ -213,6 +227,8 @@ This endpoint returns the currently loaded phonebook configuration in JSON forma
 It's primarily intended for (local or remote) debugging purposes. Some fields may be censored (e.g. passwords).
 
 Example: http://localnode.local.mesh:8081/showconfig?type=r
+
+BasicAuth protection: Yes.
 
 Required parameters:
 
@@ -232,6 +248,8 @@ This endpoint allows to update a limited set of configuration settings.
 
 Example: http://localnode.local.mesh:8081/updateconfig?source=http://hb9edi-vm-gw.local.mesh/filerepo/Phonebook/AREDN_Phonebook.csv
 
+BasicAuth protection: Yes.
+
 Required parameters:
 
 - n/a
@@ -244,7 +262,7 @@ Optional parameters:
 
 - `reload`: Defines the amount of time to wait between reloading the phonebook data from the specified source. See [flags](#flags) for more details.
 
-		Important: Be careful with updating this as it may overload upstream servers (depending on what the "source" is set to). The default value has been chosen specifically with that in mind.
+	Important: Be careful with updating this as it may overload upstream servers (depending on what the "source" is set to). The default value has been chosen specifically with that in mind.
 
 - `debug`: Defines the debug output flag (set to "true" or "false"). See [flags](#flags) for more details.
 

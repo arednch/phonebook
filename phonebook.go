@@ -88,7 +88,7 @@ func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
 	}
 	rec, err := importer.ReadPhonebook(source)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading phonebook: %s", err)
 	}
 
 	var hostData map[string]*data.OLSR
@@ -100,7 +100,7 @@ func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
 	case sysInfoURL != "":
 		hostData, err = olsr.ReadFromURL(sysInfoURL)
 		if err != nil {
-			return err
+			return fmt.Errorf("error reading OLSR data from sysinfo URL %q: %s", sysInfoURL, err)
 		}
 
 	case olsrFile != "":
@@ -110,7 +110,7 @@ func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
 		}
 		hostData, err = olsr.ReadFromFile(olsrFile)
 		if err != nil {
-			return err
+			return fmt.Errorf("error reading OLSR data from file %q: %s", olsrFile, err)
 		}
 	}
 

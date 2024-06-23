@@ -10,6 +10,7 @@ import (
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
 	"github.com/arednch/phonebook/exporter"
+	"github.com/arednch/phonebook/importer"
 )
 
 type ReloadFunc func(source, olsrFile, sysInfoURL string, debug bool) error
@@ -133,6 +134,13 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Check for supported fields to update and verify.
 	src := r.FormValue("source")
 	src = strings.TrimSpace(src)
+	if _, err := importer.ReadPhonebook(src); err != nil {
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: specified source is not readable: %s\n", err)
+		}
+		http.Error(w, "specified source cannot be read, make sure it exists and is either a valid, absolute file path or http/https URL", http.StatusInternalServerError)
+		return
+	}
 
 	var reload int
 	rs := r.FormValue("reload")
@@ -173,9 +181,9 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if cfg != nil {
 			cfg.Source = src
 		}
-		fmt.Fprintf(w, "- \"source\" now set (but not validated!): %q\n", src)
+		fmt.Fprintf(w, "- \"source\" now set to %q\n", src)
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"source\" now set (but not validated): %q\n", src)
+			fmt.Printf("/updateconfig: \"source\" now set to %q\n", src)
 		}
 	}
 

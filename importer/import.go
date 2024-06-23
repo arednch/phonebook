@@ -3,6 +3,7 @@ package importer
 import (
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -37,8 +38,10 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 		fallthrough
 	case strings.HasPrefix(path, "https://"):
 		blob, err = ReadFromURL(path)
-	default:
+	case strings.HasPrefix(path, "/"):
 		blob, err = ReadFromFile(path)
+	default:
+		err = errors.New("unknown or unsupported path scheme (needs to be a valid, absolute file path or http/https URL)")
 	}
 	if err != nil {
 		return nil, err

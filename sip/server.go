@@ -30,21 +30,27 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 	for {
 		buf := make([]byte, 1024)
 		n, addr, err := pc.ReadFrom(buf)
-		if err != nil {
+		if err != nil || n == 0 {
 			continue
 		}
+
 		go func(pc net.PacketConn, addr net.Addr, buf []byte) {
+			if s.Config.Debug {
+				fmt.Printf("SIP/Request:\n%+v\n", string(buf))
+			}
+
 			req := &data.SIPRequest{}
 			if err := req.Parse(buf); err != nil {
 				return
 			}
 
 			resp, err := s.handleRequest(req)
-			if err != nil {
+			if err != nil || resp == nil {
 				return
 			}
-			if resp == nil {
-				return
+
+			if s.Config.Debug {
+				fmt.Printf("SIP/Response:\n%+v\n", string(resp.Serialize()))
 			}
 
 			pc.WriteTo(resp.Serialize(), addr)
@@ -53,8 +59,6 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 }
 
 func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) {
-	var resp *data.SIPResponse
-
 	switch req.Method {
 	case "REGISTER":
 		return s.handleRegister(req)
@@ -64,11 +68,11 @@ func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) 
 		return s.handleAck(req)
 	case "BYE":
 		return s.handleBye(req)
+	case "":
+		return nil, nil // we are not reacting to empty requests
 	default:
-		resp = data.NewSIPResponseFromRequest(req, http.StatusMethodNotAllowed, "Method Not Allowed")
+		return data.NewSIPResponseFromRequest(req, http.StatusMethodNotAllowed, "Method Not Allowed"), nil
 	}
-
-	return resp, nil
 }
 
 func (s *Server) handleRegister(req *data.SIPRequest) (*data.SIPResponse, error) {
@@ -85,7 +89,7 @@ func (s *Server) handleBye(req *data.SIPRequest) (*data.SIPResponse, error) {
 
 func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 	if s.Config.Debug {
-		fmt.Printf("SIP/INVITE: received INVITE message from %q to %q\n", req.From(), req.To())
+		fmt.Printf("SIP/INVITE: received INVITE message from %s to %s\n", req.From(), req.To())
 	}
 
 	// Check if this is a call directed at a local identity (hostname or IP). If not, ignore it.
@@ -97,7 +101,7 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 	}
 
 	// Look up the phone number and try to find the right host in our records and redirect the call there.
-	var redirect *data.SIPURI
+	var redirect *data.SIPAddress
 	to := req.To()
 	s.Records.Mu.RLock()
 	for _, entry := range s.Records.Entries {
@@ -116,32 +120,34 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 		}
 
 		// We found an entry in the phonebook to redirect to.
-		redirect = &data.SIPURI{
-			User: entry.PhoneNumber,
-			Host: host,
+		redirect = &data.SIPAddress{
+			DisplayName: entry.Callsign,
+			URI: &data.SIPURI{
+				User: entry.PhoneNumber,
+				Host: host,
+			},
+			Params: make(map[string]string),
 		}
 		break
 	}
 	s.Records.Mu.RUnlock()
 
-	if redirect != nil {
-		resp := data.NewSIPResponseFromRequest(req, http.StatusFound, "Moved Temporarily")
-		resp.Headers = append(resp.Headers, &data.SIPHeader{
-			Name:  "Contact",
-			Value: fmt.Sprintf("\"%s\" %s", redirect.User, redirect.String()),
-			Address: &data.SIPAddress{
-				DisplayName: redirect.User,
-				URI:         redirect,
-			},
-		})
-		resp.Headers = append(resp.Headers, &data.SIPHeader{
-			Name:  "Diversion",
-			Value: fmt.Sprintf("\"%s\" %s;reason=unconditional", redirect.User, redirect.String()),
-		})
-
-		return resp, nil
+	if redirect == nil {
+		// As a last resort, we're giving up and tell the client that we can't route that call.
+		return data.NewSIPResponseFromRequest(req, http.StatusNotFound, "Not Found"), nil
 	}
 
-	// As a last resort, we're giving up and tell the client that we can't route that call.
-	return data.NewSIPResponseFromRequest(req, http.StatusNotFound, "Not Found"), nil
+	resp := data.NewSIPResponseFromRequest(req, http.StatusFound, "Moved Temporarily")
+	resp.Headers = append(resp.Headers, &data.SIPHeader{
+		Name:    "Contact",
+		Value:   redirect.String(),
+		Address: redirect,
+	})
+	redirect.Params["reason"] = "unconditional"
+	resp.Headers = append(resp.Headers, &data.SIPHeader{
+		Name:    "Diversion",
+		Value:   redirect.String(),
+		Address: redirect,
+	})
+	return resp, nil
 }

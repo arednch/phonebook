@@ -173,9 +173,14 @@ type SIPHeader struct {
 }
 
 func (h *SIPHeader) Clone() SIPHeader {
+	var addr *SIPAddress
+	if h.Address != nil {
+		addr = h.Address.Clone()
+	}
 	return SIPHeader{
-		Name:  h.Name,
-		Value: h.Value,
+		Name:    h.Name,
+		Value:   h.Value,
+		Address: addr,
 	}
 }
 
@@ -190,7 +195,9 @@ func (h *SIPHeader) parse(line string) error {
 
 	switch strings.ToLower(h.Name) {
 	case "to", "from", "contact":
-		addr := &SIPAddress{}
+		addr := &SIPAddress{
+			Params: make(map[string]string),
+		}
 		if err := addr.Parse(h.Value); err == nil {
 			h.Address = addr
 		}
@@ -209,8 +216,31 @@ type SIPAddress struct {
 	Params      map[string]string
 }
 
+func (a *SIPAddress) Clone() *SIPAddress {
+	p := make(map[string]string)
+	for k, v := range a.Params {
+		p[k] = v
+	}
+	var uri *SIPURI
+	if a.URI != nil {
+		uri = a.URI.Clone()
+	}
+	return &SIPAddress{
+		DisplayName: a.DisplayName,
+		Params:      p,
+		URI:         uri,
+	}
+}
+
 func (a *SIPAddress) String() string {
-	return a.URI.String()
+	uri := fmt.Sprintf("<%s>", a.URI.String())
+	if a.DisplayName != "" {
+		uri = fmt.Sprintf("\"%s\" <%s>", a.DisplayName, a.URI.String())
+	}
+	if len(a.Params) > 0 {
+		return uri + ";" + paramsToString(a.Params)
+	}
+	return uri
 }
 
 func (a *SIPAddress) Parse(line string) error {
@@ -223,6 +253,16 @@ func (a *SIPAddress) Parse(line string) error {
 	a.DisplayName, uri = findDisplayName(l)
 	a.URI = parseSIPURI(uri)
 
+	var parts []string
+	if strings.Contains(l, ">") {
+		parts = strings.Split(l, ">;")
+	} else {
+		parts = strings.Split(l, ";")
+	}
+	if len(parts) > 1 {
+		a.Params = parseParameters(parts[1])
+	}
+
 	return nil
 }
 
@@ -231,10 +271,11 @@ func (a *SIPAddress) Parse(line string) error {
 func parseSIPURI(l string) *SIPURI {
 	l = strings.TrimSpace(l)
 	l = strings.TrimPrefix(l, "sip:")
-	l = strings.Split(l, ";")[0] // ignore parameters for now
+	l = strings.TrimPrefix(l, "sips:")
+	lp := strings.Split(l, ";")
 
 	uri := &SIPURI{}
-	parts := strings.Split(l, "@")
+	parts := strings.Split(lp[0], "@")
 	if len(parts) > 1 {
 		user := strings.Split(parts[0], ":")
 		uri.User = user[0] // ignoring the possibility that there may be a password
@@ -252,6 +293,9 @@ func parseSIPURI(l string) *SIPURI {
 			p, _ := strconv.Atoi(host[1])
 			uri.Port = p
 		}
+	}
+	if len(lp) > 1 {
+		uri.Params = parseParameters(lp[1])
 	}
 
 	return uri
@@ -313,8 +357,48 @@ func findURI(l string) string {
 	return l
 }
 
-func (a *SIPAddress) Serialize() []byte {
-	return nil
+func parseParameters(l string) map[string]string {
+	var start int
+	var k string
+	params := make(map[string]string)
+	for i, c := range l {
+		switch c {
+		case '=':
+			k = l[start:i]
+			start = i + 1
+		case ';':
+			if k == "" {
+				params[l[start:i]] = ""
+			} else {
+				params[k] = l[start:i]
+			}
+			k = ""
+			start = i + 1
+		}
+	}
+	if k != "" {
+		params[k] = l[start:]
+	}
+	return params
+}
+
+func paramsToString(params map[string]string) string {
+	var p []string
+	for k, v := range params {
+		// we should probably also encode this / check for character set
+		// for now we rely on users to set the right one
+		k = strings.TrimSpace(k)
+		v = strings.TrimSpace(v)
+		if v == "" {
+			p = append(p, k)
+		} else {
+			p = append(p, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+	if len(p) == 0 {
+		return ""
+	}
+	return strings.Join(p, ";")
 }
 
 type SIPURI struct {
@@ -324,13 +408,30 @@ type SIPURI struct {
 	Params map[string]string
 }
 
+func (u *SIPURI) Clone() *SIPURI {
+	p := make(map[string]string)
+	for k, v := range u.Params {
+		p[k] = v
+	}
+	return &SIPURI{
+		User:   u.User,
+		Host:   u.Host,
+		Port:   u.Port,
+		Params: p,
+	}
+}
+
 func (u *SIPURI) String() string {
 	host := u.Host
 	if u.Port > 0 {
 		host = fmt.Sprintf("%s:%d", host, u.Port)
 	}
+	user := fmt.Sprintf("sip:%s@%s", u.User, host)
 	if u.User == "" {
-		return fmt.Sprintf("<sip:%s>", host)
+		user = fmt.Sprintf("sip:%s", host)
 	}
-	return fmt.Sprintf("<sip:%s@%s>", u.User, host)
+	if len(u.Params) > 1 {
+		return user + ";" + paramsToString(u.Params)
+	}
+	return user
 }

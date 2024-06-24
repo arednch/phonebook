@@ -15,8 +15,7 @@ type SIPRequest struct {
 	SIPVersion string // Set to 2.0 version by default
 	Headers    []*SIPHeader
 
-	// Not implemented at least for now.
-	// Body []byte
+	Body []byte
 }
 
 func (r *SIPRequest) From() *SIPAddress {
@@ -149,7 +148,9 @@ func (r *SIPResponse) Serialize() []byte {
 		buf.WriteString(hdr.serialize())
 		buf.WriteString("\r\n")
 	}
-	buf.WriteString("Content-Length: 0\r\n")
+	buf.WriteString("Content-Length: ")
+	buf.WriteString(strconv.Itoa(len(r.Body)))
+	buf.WriteString("\r\n")
 
 	// Empty line
 	buf.WriteString("\r\n")
@@ -166,7 +167,9 @@ type SIPHeader struct {
 	Name  string
 	Value string
 
-	Address *SIPAddress // Optionally set when header has an address.
+	// Optionally set when header has an address.
+	// Note: This is parsed but not used during serialization!
+	Address *SIPAddress
 }
 
 func (h *SIPHeader) Clone() SIPHeader {

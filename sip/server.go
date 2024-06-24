@@ -128,7 +128,7 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 		resp := data.NewSIPResponseFromRequest(req, http.StatusFound, "Moved Temporarily")
 		resp.Headers = append(resp.Headers, &data.SIPHeader{
 			Name:  "Contact",
-			Value: redirect.String(),
+			Value: fmt.Sprintf("\"%s\" %s", redirect.User, redirect.String()),
 			Address: &data.SIPAddress{
 				DisplayName: redirect.User,
 				URI:         redirect,
@@ -136,7 +136,7 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 		})
 		resp.Headers = append(resp.Headers, &data.SIPHeader{
 			Name:  "Diversion",
-			Value: fmt.Sprintf("\"%s\" <%s>;reason=unconditional", redirect.User, redirect.String()),
+			Value: fmt.Sprintf("\"%s\" %s;reason=unconditional", redirect.User, redirect.String()),
 		})
 
 		return resp, nil

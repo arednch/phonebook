@@ -1,60 +1,120 @@
 package sip
 
 import (
+	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"strconv"
 	"strings"
-
-	"github.com/emiago/sipgo"
-	"github.com/emiago/sipgo/sip"
+	"time"
 
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
 )
 
+const (
+	registerExpiration = 10 * time.Minute
+)
+
 type Server struct {
 	Config *configuration.Config
 
-	Records *data.Records
-
-	UA  *sipgo.UserAgent
-	Srv *sipgo.Server
+	Records       *data.Records
+	RegisterCache *data.TTLCache[string, *data.SIPClient]
 
 	// Local hostnames and IPs to react to.
 	LocalIdentities map[string]bool
 }
 
-func (s *Server) OnRegister(req *sip.Request, tx sip.ServerTransaction) {
-	if s.Config.Debug {
-		fmt.Printf("SIP/REGISTER: received REGISTER message from %s\n", req.Source())
+func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
+	pc, err := net.ListenPacket(proto, addr)
+	if err != nil {
+		return fmt.Errorf("SIP: unable to listen: %s", err)
 	}
-	// Respond with OK in all cases. No credentials are checked.
-	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-		fmt.Printf("SIP/REGISTER: error sending response: %s\n", err)
+	defer pc.Close()
+
+	for {
+		buf := make([]byte, 1024)
+		n, addr, err := pc.ReadFrom(buf)
+		if err != nil || n == 0 {
+			continue
+		}
+
+		go func(pc net.PacketConn, addr net.Addr, buf []byte) {
+			if s.Config.Debug {
+				fmt.Printf("SIP/Request:\n%+v\n", string(buf))
+			}
+
+			req := &data.SIPRequest{}
+			if err := req.Parse(buf); err != nil {
+				return
+			}
+
+			resp, err := s.handleRequest(req)
+			if err != nil || resp == nil {
+				return
+			}
+
+			if s.Config.Debug {
+				fmt.Printf("SIP/Response:\n%+v\n", string(resp.Serialize()))
+			}
+
+			pc.WriteTo(resp.Serialize(), addr)
+		}(pc, addr, buf[:n])
 	}
 }
 
-func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
+func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) {
+	switch req.Method {
+	case "REGISTER":
+		return s.handleRegister(req)
+	case "INVITE":
+		return s.handleInvite(req)
+	case "ACK":
+		return s.handleAck(req)
+	case "":
+		return nil, nil // we are not reacting to empty requests
+	default:
+		return data.NewSIPResponseFromRequest(req, http.StatusMethodNotAllowed, "Method Not Allowed"), nil
+	}
+}
+
+func (s *Server) handleRegister(req *data.SIPRequest) (*data.SIPResponse, error) {
+	client := data.NewSIPClientFromRegister(req)
+	s.RegisterCache.Set(client.Key(), client, registerExpiration)
 	if s.Config.Debug {
-		fmt.Printf("SIP/INVITE: received INVITE message from %q to %q\n", req.From(), req.To())
+		fmt.Printf("SIP/REGISTER: received REGISTER message from %s\n", client.Key())
+	}
+
+	resp := data.NewSIPResponseFromRequest(req, http.StatusOK, "OK")
+	resp.AddHeader("Expires", strconv.Itoa(int(registerExpiration.Seconds())))
+	return resp, nil
+}
+
+func (s *Server) handleAck(_ *data.SIPRequest) (*data.SIPResponse, error) {
+	return nil, nil
+}
+
+func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
+	if s.Config.Debug {
+		fmt.Printf("SIP/INVITE: received INVITE message from %s to %s\n", req.From(), req.To())
 	}
 
 	// Check if this is a call directed at a local identity (hostname or IP). If not, ignore it.
 	// This also helps reducing retry storms for some clients (e.g. Linphone).
 	if s.LocalIdentities != nil {
-		if local, ok := s.LocalIdentities[strings.ToLower(req.To().Address.Host)]; !ok || !local {
-			if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusNotFound, "Not Found", nil)); err != nil {
-				fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
-			}
-			return
+		if local, ok := s.LocalIdentities[strings.ToLower(req.To().URI.Host)]; !ok || !local {
+			return data.NewSIPResponseFromRequest(req, http.StatusNotFound, "Not Found"), nil
 		}
 	}
 
-	// Look up the phone number and try to find the right host in our records and redirect the call there.
-	var redirect *sip.Uri
+	var redirect *data.SIPAddress
 	to := req.To()
+	// Look up the phone number and try to find the right host in our records and redirect the call there.
 	s.Records.Mu.RLock()
 	for _, entry := range s.Records.Entries {
-		if entry.PhoneNumber != to.Address.User {
+		if entry.PhoneNumber != to.URI.User {
 			continue
 		}
 
@@ -69,48 +129,36 @@ func (s *Server) OnInvite(req *sip.Request, tx sip.ServerTransaction) {
 		}
 
 		// We found an entry in the phonebook to redirect to.
-		redirect = &sip.Uri{
-			User: entry.PhoneNumber,
-			Host: host,
-			// Port: 5060,
-			// UriParams: sip.HeaderParams{
-			// 	"Transport": "udp",
-			// },
+		redirect = &data.SIPAddress{
+			DisplayName: entry.Callsign,
+			URI: &data.SIPURI{
+				User: entry.PhoneNumber,
+				Host: host,
+			},
+			Params: make(map[string]string),
 		}
 		break
 	}
 	s.Records.Mu.RUnlock()
 
-	if redirect != nil {
-		resp := sip.NewResponseFromRequest(req, sip.StatusMovedTemporarily, "Moved Temporarily", nil)
-		resp.AppendHeaderAfter(&sip.ContactHeader{
-			DisplayName: redirect.User,
-			Address:     *redirect,
-		}, "To")
-		resp.AppendHeaderAfter(sip.NewHeader("Diversion", fmt.Sprintf("\"%s\" <%s>;reason=unconditional", redirect.User, redirect.String())), "To")
-		if err := tx.Respond(resp); err != nil {
-			fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
+	// If we can't find it in the phonebook, we try locally registered clients.
+	if redirect == nil {
+		reg, ok := s.RegisterCache.Get(to.URI.User)
+		if ok {
+			redirect = reg.Address.Clone()
+			redirect.URI.Params = make(map[string]string)
+			redirect.Params = make(map[string]string)
 		}
-		return
 	}
 
-	// As a last resort, we're giving up and tell the client that we can't route that call.
-	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusNotFound, "Not Found", nil)); err != nil {
-		fmt.Printf("SIP/INVITE: error sending response: %s\n", err)
+	if redirect == nil {
+		// As a last resort, we're giving up and tell the client that we can't route that call.
+		return data.NewSIPResponseFromRequest(req, http.StatusNotFound, "Not Found"), nil
 	}
-}
 
-func (s *Server) OnAck(req *sip.Request, tx sip.ServerTransaction) {
-}
-
-func (s *Server) OnBye(req *sip.Request, tx sip.ServerTransaction) {
-	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-		fmt.Printf("SIP/BYE: error sending response: %s\n", err)
-	}
-}
-
-func (s *Server) OnPublish(req *sip.Request, tx sip.ServerTransaction) {
-	if err := tx.Respond(sip.NewResponseFromRequest(req, sip.StatusOK, "OK", nil)); err != nil {
-		fmt.Printf("SIP/PUBLISH: error sending response: %s\n", err)
-	}
+	resp := data.NewSIPResponseFromRequest(req, http.StatusFound, "Moved Temporarily")
+	resp.AddHeader("Contact", redirect.String())
+	redirect.Params["reason"] = "unconditional"
+	resp.AddHeader("Diversion", redirect.String())
+	return resp, nil
 }

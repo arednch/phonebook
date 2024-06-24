@@ -5,16 +5,23 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/arednch/phonebook/configuration"
 	"github.com/arednch/phonebook/data"
 )
 
+const (
+	registerExpiration = 10 * time.Minute
+)
+
 type Server struct {
 	Config *configuration.Config
 
-	Records *data.Records
+	Records       *data.Records
+	RegisterCache *data.TTLCache[string, *data.SIPClient]
 
 	// Local hostnames and IPs to react to.
 	LocalIdentities map[string]bool
@@ -66,8 +73,6 @@ func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) 
 		return s.handleInvite(req)
 	case "ACK":
 		return s.handleAck(req)
-	case "BYE":
-		return s.handleBye(req)
 	case "":
 		return nil, nil // we are not reacting to empty requests
 	default:
@@ -76,15 +81,19 @@ func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) 
 }
 
 func (s *Server) handleRegister(req *data.SIPRequest) (*data.SIPResponse, error) {
-	return data.NewSIPResponseFromRequest(req, http.StatusOK, "OK"), nil
+	client := data.NewSIPClientFromRegister(req)
+	s.RegisterCache.Set(client.Key(), client, registerExpiration)
+	if s.Config.Debug {
+		fmt.Printf("SIP/REGISTER: received REGISTER message from %s\n", client.Key())
+	}
+
+	resp := data.NewSIPResponseFromRequest(req, http.StatusOK, "OK")
+	resp.AddHeader("Expires", strconv.Itoa(int(registerExpiration.Seconds())))
+	return resp, nil
 }
 
 func (s *Server) handleAck(_ *data.SIPRequest) (*data.SIPResponse, error) {
 	return nil, nil
-}
-
-func (s *Server) handleBye(req *data.SIPRequest) (*data.SIPResponse, error) {
-	return data.NewSIPResponseFromRequest(req, http.StatusOK, "OK"), nil
 }
 
 func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
@@ -100,9 +109,9 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 		}
 	}
 
-	// Look up the phone number and try to find the right host in our records and redirect the call there.
 	var redirect *data.SIPAddress
 	to := req.To()
+	// Look up the phone number and try to find the right host in our records and redirect the call there.
 	s.Records.Mu.RLock()
 	for _, entry := range s.Records.Entries {
 		if entry.PhoneNumber != to.URI.User {
@@ -132,22 +141,24 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 	}
 	s.Records.Mu.RUnlock()
 
+	// If we can't find it in the phonebook, we try locally registered clients.
+	if redirect == nil {
+		reg, ok := s.RegisterCache.Get(to.URI.User)
+		if ok {
+			redirect = reg.Address.Clone()
+			redirect.URI.Params = make(map[string]string)
+			redirect.Params = make(map[string]string)
+		}
+	}
+
 	if redirect == nil {
 		// As a last resort, we're giving up and tell the client that we can't route that call.
 		return data.NewSIPResponseFromRequest(req, http.StatusNotFound, "Not Found"), nil
 	}
 
 	resp := data.NewSIPResponseFromRequest(req, http.StatusFound, "Moved Temporarily")
-	resp.Headers = append(resp.Headers, &data.SIPHeader{
-		Name:    "Contact",
-		Value:   redirect.String(),
-		Address: redirect,
-	})
+	resp.AddHeader("Contact", redirect.String())
 	redirect.Params["reason"] = "unconditional"
-	resp.Headers = append(resp.Headers, &data.SIPHeader{
-		Name:    "Diversion",
-		Value:   redirect.String(),
-		Address: redirect,
-	})
+	resp.AddHeader("Diversion", redirect.String())
 	return resp, nil
 }

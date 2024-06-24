@@ -9,17 +9,14 @@ import (
 	"strings"
 )
 
-type SIPRequest struct {
-	Method     string
-	URI        string
+type SIPMessage struct {
 	SIPVersion string // Set to 2.0 version by default
 	Headers    []*SIPHeader
-
-	Body []byte
+	Body       []byte
 }
 
-func (r *SIPRequest) From() *SIPAddress {
-	for _, hdr := range r.Headers {
+func (m *SIPMessage) From() *SIPAddress {
+	for _, hdr := range m.Headers {
 		if strings.ToLower(hdr.Name) != "from" {
 			continue
 		}
@@ -28,14 +25,60 @@ func (r *SIPRequest) From() *SIPAddress {
 	return nil
 }
 
-func (r *SIPRequest) To() *SIPAddress {
-	for _, hdr := range r.Headers {
+func (m *SIPMessage) To() *SIPAddress {
+	for _, hdr := range m.Headers {
 		if strings.ToLower(hdr.Name) != "to" {
 			continue
 		}
 		return hdr.Address
 	}
 	return nil
+}
+
+func (m *SIPMessage) Contact() *SIPAddress {
+	for _, hdr := range m.Headers {
+		if strings.ToLower(hdr.Name) != "contact" {
+			continue
+		}
+		return hdr.Address
+	}
+	return nil
+}
+
+func (m *SIPMessage) AddHeader(name, value string) {
+	m.Headers = append(m.Headers, &SIPHeader{
+		Name:  name,
+		Value: value,
+	})
+}
+
+func (m *SIPMessage) FindHeaders(name string) []*SIPHeader {
+	var hdrs []*SIPHeader
+	name = strings.ToLower(name)
+	for _, hdr := range m.Headers {
+		if strings.ToLower(hdr.Name) == name {
+			hdrs = append(hdrs, hdr)
+		}
+	}
+	return hdrs
+}
+
+func (m *SIPMessage) RemoveHeaders(name string) {
+	var hdrs []*SIPHeader
+	name = strings.ToLower(name)
+	for _, hdr := range m.Headers {
+		if strings.ToLower(hdr.Name) == name {
+			continue
+		}
+		hdrs = append(hdrs, hdr)
+	}
+	m.Headers = hdrs
+}
+
+type SIPRequest struct {
+	SIPMessage
+	Method string
+	URI    string
 }
 
 func (r *SIPRequest) Parse(data []byte) error {
@@ -93,7 +136,9 @@ func (r *SIPRequest) parseSIPHeader(line string) error {
 
 func NewSIPResponseFromRequest(req *SIPRequest, statusCode int, statusMsg string) *SIPResponse {
 	resp := &SIPResponse{
-		SIPVersion:    req.SIPVersion,
+		SIPMessage: SIPMessage{
+			SIPVersion: req.SIPVersion,
+		},
 		StatusCode:    statusCode,
 		StatusMessage: statusMsg,
 	}
@@ -124,12 +169,9 @@ func copyHeader(name string, req *SIPRequest, resp *SIPResponse) {
 }
 
 type SIPResponse struct {
-	SIPVersion    string // Set to 2.0 version by default
+	SIPMessage
 	StatusCode    int
 	StatusMessage string
-	Headers       []*SIPHeader
-
-	Body []byte
 }
 
 func (r *SIPResponse) Serialize() []byte {
@@ -434,4 +476,25 @@ func (u *SIPURI) String() string {
 		return user + ";" + paramsToString(u.Params)
 	}
 	return user
+}
+
+type SIPClient struct {
+	Address *SIPAddress
+}
+
+func (c *SIPClient) Key() string {
+	return c.Address.URI.User
+}
+
+func NewSIPClientFromRegister(req *SIPRequest) *SIPClient {
+	if req.Method != "REGISTER" {
+		return nil
+	}
+
+	addr := req.Contact()
+	addr.URI.Params = make(map[string]string)
+	addr.Params = make(map[string]string)
+	return &SIPClient{
+		Address: addr,
+	}
 }

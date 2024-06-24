@@ -277,6 +277,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 		s := &sip.Server{
 			Config:          cfg,
 			Records:         records,
+			RegisterCache:   data.NewTTL[string, *data.SIPClient](),
 			LocalIdentities: identities,
 		}
 

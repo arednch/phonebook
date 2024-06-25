@@ -272,8 +272,53 @@ Optional parameters:
 
 ## Supported Devices
 
-Note: The following list is not complete. It will work with many more devices. This is the list of "confirmed tested" devices at some point in time (not with every release!). If you have other devices that work, please let us know.
+**Notes**:
 
-- Yealink T41P: XML (`generic`, `yealink`), LDAP
-- Yealink T48G: XML (`generic`, `yealink`), LDAP
-- Linphone (iOS, iPadOS, Android, Chromebook, Ubuntu): LDAP
+- The above list is not complete. It will work with many more devices. This is just the list of "confirmed tested" devices at some point in time.
+- The list is NOT retested with each release so some changes are expected over time.
+- If you have other devices that work or you're happy to test for us, please let us know.
+
+**Legend**:
+
+- 🟢: This feature works.
+- 🟡: This feature only works partially with this device.
+- 🔴: This feature does not work with this device.
+- n/a: This hasn't been tested with that device.
+
+### Nodes
+
+|           | MikroTik hAP AC Lite | MikroTik hAP AC3  |
+|:----------|:--------------------:|:-----------------:|
+| SKU       | RB952Ui-5ac2nD       | RBD53iG-5HacD2HnD |
+| Target    | ath79                | ipq40xx           |
+| Arch      | MIPS                 | ARM Cortex        |
+| RAM       | 64MB                 | 256MB             |
+| Disk      | n/a                  | n/a               |
+| Phonebook | [🟢 (space constraint)](#hap-ac-lite-space) | 🟢                 |
+
+**Known Limitations**:
+
+Note: This list is dynamic and we update it as well as possible but it's likely incomplete and not always up to date with the latest developments. If you have updates, please let us know.
+
+- <a id="hap-ac-lite-space">hAP AC Lite (Space)</a>: 
+
+### Phones
+
+| **Feature**            | Yealink T48G | Yealink T41P | Grandstream GXP1620 | Snom D120 | Linphone (iOS)    |
+|:-----------------------|:------------:|:------------:|:-------------------:|:---------:|:-----------------:|
+| **Server**             |              |              |                     |           |                   |
+| Phonebook: XML         | 🟢           | 🟢           | n/a                  | n/a       | 🔴                 |
+| Phonebook: vCard       | n/a          | n/a          | n/a                 | n/a       | 🔴                 |
+| **LDAP**               |              |              |                     |           |                   |
+| Basic: Fetch contacts  | 🟢           | 🟢           | 🟢                   | n/a       | 🟢                 |
+| Search                 | 🟢           | n/a          | n/a                 | n/a       | 🟢                 |
+| **SIP**                |              |              |                     |           |                   |
+| Basic: Register        | 🟢           | 🟢           | n/a                  | 🟢        | 🟢                 |
+| Redirect calls (AREDN) | 🟢           | n/a          | n/a                 | n/a       | [🟡 (only incoming)](#linphone-sip-redirect) |
+| Redirect calls (local) | 🟢           | n/a          | n/a                 | n/a       | [🟡 (only incoming)](#linphone-sip-redirect) |
+
+**Known Limitations**:
+
+Note: This list is dynamic and we update it as well as possible but it's likely incomplete and not always up to date with the latest developments. If you have updates, please let us know.
+
+- <a id="linphone-sip-redirect">Linphone (SIP Call Redirects)</a>: Linphone does not correctly parse call redirection responses from SIP Servers and instead of calling the redirect contact on the new host, keep calling the original SIP server instead.

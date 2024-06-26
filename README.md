@@ -304,21 +304,24 @@ Note: This list is dynamic and we update it as well as possible but it's likely 
 
 ### Phones
 
-| **Feature**            | Yealink T48G | Yealink T41P | Grandstream GXP1620 | Snom D120 | Linphone (iOS)    |
-|:-----------------------|:------------:|:------------:|:-------------------:|:---------:|:-----------------:|
-| **Server**             |              |              |                     |           |                   |
-| Phonebook: XML         | 🟢           | 🟢           | n/a                  | n/a       | 🔴                 |
-| Phonebook: vCard       | n/a          | n/a          | n/a                 | n/a       | 🔴                 |
-| **LDAP**               |              |              |                     |           |                   |
-| Basic: Fetch contacts  | 🟢           | 🟢           | 🟢                   | n/a       | 🟢                 |
-| Search                 | 🟢           | n/a          | n/a                 | n/a       | 🟢                 |
-| **SIP**                |              |              |                     |           |                   |
-| Basic: Register        | 🟢           | 🟢           | n/a                  | 🟢        | 🟢                 |
-| Redirect calls (AREDN) | 🟢           | n/a          | n/a                 | n/a       | [🟡 (only incoming)](#linphone-sip-redirect) |
-| Redirect calls (local) | 🟢           | n/a          | n/a                 | n/a       | [🟡 (only incoming)](#linphone-sip-redirect) |
+| **Feature**            | Yealink T48G | Yealink T41P | Grandstream GXP1620 | Snom D120 | Linphone ([iOS](https://apps.apple.com/app/linphone/id360065638))    | Acrobits Softphone ([iOS](https://apps.apple.com/app/acrobits-softphone/id314192799)) |
+|:-----------------------|:------------:|:------------:|:-------------------:|:---------:|:-----------------:|:------------------------:|
+| **Server**             |              |              |                     |           |                   |                          |
+| Phonebook: XML         | 🟢           | 🟢           | n/a                  | n/a       | 🔴               | [🔴 (no support)](#generic-no-support) |
+| Phonebook: vCard       | n/a          | n/a          | n/a                 | n/a       | 🔴                | [🔴 (no support)](#generic-no-support) |
+| **LDAP**               |              |              |                     |           |                   |                          |
+| Basic: Fetch contacts  | 🟢           | 🟢           | 🟢                   | n/a       | 🟢               | [🔴 (no support)](#generic-no-support) |
+| Search                 | 🟢           | n/a          | n/a                 | n/a       | 🟢                | [🔴 (no support)](#generic-no-support) |
+| **SIP**                |              |              |                     |           |                   |                          |
+| Basic: Register        | 🟢           | 🟢           | n/a                  | 🟢        | 🟢               | 🟢                       |
+| Redirect calls (AREDN) | 🟢           | n/a          | n/a                 | n/a       | [🟡 (only incoming)](#linphone-sip-redirect) | 🟢             |
+| Redirect calls (local) | 🟢           | n/a          | n/a                 | n/a       | [🟡 (only incoming)](#linphone-sip-redirect) | 🟢             |
+| Callback from History  | 🟢           | 🟢           | 🟢                  | n/a       | [n/a](#linphone-sip-redirect)                | 🟢             |
 
 **Known Limitations**:
 
 Note: This list is dynamic and we update it as well as possible but it's likely incomplete and not always up to date with the latest developments. If you have updates, please let us know.
+
+- <a id="generic-no-support">No support</a>: The app or device does not support this feature, i.e. nothing we can change.
 
 - <a id="linphone-sip-redirect">Linphone (SIP Call Redirects)</a>: Linphone does not correctly parse call redirection responses from SIP Servers and instead of calling the redirect contact on the new host, keep calling the original SIP server instead.

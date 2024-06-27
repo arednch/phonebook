@@ -300,7 +300,7 @@ Optional parameters:
 
 Note: This list is dynamic and we update it as well as possible but it's likely incomplete and not always up to date with the latest developments. If you have updates, please let us know.
 
-- <a id="hap-ac-lite-space">hAP AC Lite (Space)</a>: 
+- <a id="hap-ac-lite-space">hAP AC Lite (Space)</a>: There is a small amount of space left on this device and thus installing the phonebook occasionally leads to space problems. Make sure to uninstall other packages or worst case, reinstall the firmware from scratch (without keeping the configuration) if you're running into this.
 
 ### Phones
 

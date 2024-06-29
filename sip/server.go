@@ -105,6 +105,9 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 	// This also helps reducing retry storms for some clients (e.g. Linphone).
 	if s.LocalIdentities != nil {
 		if local, ok := s.LocalIdentities[strings.ToLower(req.To().URI.Host)]; !ok || !local {
+			if s.Config.Debug {
+				fmt.Printf("  - Ignoring call to non-local server: %s\n", req.To())
+			}
 			return data.NewSIPResponseFromRequest(req, http.StatusNotFound, "Not Found"), nil
 		}
 	}
@@ -152,6 +155,9 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 	}
 
 	if redirect == nil {
+		if s.Config.Debug {
+			fmt.Printf("  - Couldn't find redirect destination for %s\n", req.To())
+		}
 		// As a last resort, we're giving up and tell the client that we can't route that call.
 		return data.NewSIPResponseFromRequest(req, http.StatusNotFound, "Not Found"), nil
 	}

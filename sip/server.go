@@ -81,10 +81,11 @@ func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) 
 }
 
 func (s *Server) handleRegister(req *data.SIPRequest) (*data.SIPResponse, error) {
-	client := data.NewSIPClientFromRegister(req)
-	s.RegisterCache.Set(client.Key(), client, registerExpiration)
-	if s.Config.Debug {
-		fmt.Printf("SIP/REGISTER: received REGISTER message from %s\n", client.Key())
+	if client := data.NewSIPClientFromRegister(req); client != nil {
+		s.RegisterCache.Set(client.Key(), client, registerExpiration)
+		if s.Config.Debug {
+			fmt.Printf("SIP/REGISTER: received REGISTER message from %s\n", client.Key())
+		}
 	}
 
 	resp := data.NewSIPResponseFromRequest(req, http.StatusOK, "OK")

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,7 @@ var (
 	debug           = flag.Bool("debug", false, "Turns on verbose logging to stdout when set to true.")
 	allowRtCfgChg   = flag.Bool("allow_runtime_config_changes", false, "Allows runtime config changes via web server when set to true.")
 	allowPermCfgChg = flag.Bool("allow_permanent_config_changes", false, "Allows permanent config changes via web server when set to true.")
+	includeRoutable = flag.Bool("include_routable", false, "Also include routable phone numbers not in the phonebook.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
@@ -61,9 +63,6 @@ var (
 
 const (
 	defaultExtension = ".xml"
-
-	AREDNDomain    = "local.mesh"
-	AREDNLocalNode = "localnode.local.mesh" // AREDN default for local node
 )
 
 var (
@@ -80,50 +79,79 @@ var (
 	}
 )
 
-func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
-	if debug {
-		fmt.Printf("Reading phonebook from %q\n", source)
+func mergePhonebookWithRouting(records []*data.Entry, hostData map[string]*data.OLSR, cfg *configuration.Config) []*data.Entry {
+	addedOLSR := make(map[string]bool)
+	// First find all phonebook entries with an OLSR entry.
+	for _, e := range records {
+		hostname := strings.Split(e.PhoneNumber, ".")[0]
+		o, ok := hostData[hostname]
+		if ok {
+			e.OLSR = o
+			addedOLSR[hostname] = true
+			continue
+		}
 	}
-	rec, err := importer.ReadPhonebook(source)
+	if cfg.Debug {
+		fmt.Printf("Merged phonebook with routing data. Found %d matches for %d entries in %d known hosts.\n", len(records), len(addedOLSR), len(hostData))
+	}
+	if !cfg.IncludeRoutable {
+		return records
+	}
+
+	// Then find the OLSR entries which have no phonebook entry and create one for them if configured to do so.
+	var routableEntries []*data.Entry
+	for hn, o := range hostData {
+		if _, ok := addedOLSR[hn]; ok {
+			continue // ignore entries which are already covered by the phonebook
+		}
+		if _, err := strconv.Atoi(hn); err != nil {
+			continue // ignore entries which do not seem to be a phonenumber
+		}
+		if cfg.Debug {
+			fmt.Printf("  - adding routable entry %s (%s)\n", o.Hostname, o.IP)
+		}
+		routableEntries = append(routableEntries, data.NewEntryFromOLSR(o))
+	}
+	if cfg.Debug {
+		fmt.Printf("Merged added another %d routable entries.\n", len(routableEntries))
+	}
+
+	return append(records, routableEntries...)
+}
+
+func refreshRecords(cfg *configuration.Config) error {
+	if cfg.Debug {
+		fmt.Printf("Reading phonebook from %q\n", cfg.Source)
+	}
+	rec, err := importer.ReadPhonebook(cfg.Source)
 	if err != nil {
 		return fmt.Errorf("error reading phonebook: %s", err)
 	}
 
 	var hostData map[string]*data.OLSR
 	switch {
-	case olsrFile == "" && sysInfoURL == "":
+	case cfg.OLSRFile == "" && cfg.SysInfoURL == "":
 		fmt.Println("not reading network information: neither OLSR file nor sysinfo URL specified")
 		return nil
 
-	case sysInfoURL != "":
-		hostData, err = olsr.ReadFromURL(sysInfoURL)
+	case cfg.SysInfoURL != "":
+		hostData, err = olsr.ReadFromURL(cfg.SysInfoURL)
 		if err != nil {
-			return fmt.Errorf("error reading OLSR data from sysinfo URL %q: %s", sysInfoURL, err)
+			return fmt.Errorf("error reading OLSR data from sysinfo URL %q: %s", cfg.SysInfoURL, err)
 		}
 
-	case olsrFile != "":
-		if _, err := os.Stat(olsrFile); err != nil {
-			fmt.Printf("not reading network information: OLSR file %q does not exist\n", olsrFile)
+	case cfg.OLSRFile != "":
+		if _, err := os.Stat(cfg.OLSRFile); err != nil {
+			fmt.Printf("not reading network information: OLSR file %q does not exist\n", cfg.OLSRFile)
 			return nil
 		}
-		hostData, err = olsr.ReadFromFile(olsrFile)
+		hostData, err = olsr.ReadFromFile(cfg.OLSRFile)
 		if err != nil {
-			return fmt.Errorf("error reading OLSR data from file %q: %s", olsrFile, err)
+			return fmt.Errorf("error reading OLSR data from file %q: %s", cfg.OLSRFile, err)
 		}
 	}
 
-	for _, e := range rec {
-		addrParts := strings.Split(e.IPAddress, data.SIPSeparator)
-		if len(addrParts) != 2 {
-			continue
-		}
-		hostname := addrParts[1]
-		o, ok := hostData[strings.Split(hostname, ".")[0]]
-		if !ok {
-			continue
-		}
-		e.OLSR = o
-	}
+	rec = mergePhonebookWithRouting(rec, hostData, cfg)
 
 	records.Mu.Lock()
 	defer records.Mu.Unlock()
@@ -132,13 +160,13 @@ func refreshRecords(source, olsrFile, sysInfoURL string, debug bool) error {
 	return nil
 }
 
-func exportOnce(path, activePfx string, formats, targets []string, resolve, indicateActive, filterInactive, debug bool) error {
+func exportOnce(cfg *configuration.Config) error {
 	records.Mu.RLock()
 	defer records.Mu.RUnlock()
 	sort.Sort(data.ByName(records.Entries))
 
-	for _, outTgt := range targets {
-		if debug {
+	for _, outTgt := range cfg.Targets {
+		if cfg.Debug {
 			fmt.Printf("Exporting for target %q\n", outTgt)
 		}
 		outTgt := strings.ToLower(strings.TrimSpace(outTgt))
@@ -152,31 +180,31 @@ func exportOnce(path, activePfx string, formats, targets []string, resolve, indi
 			ext = defaultExtension
 		}
 
-		for _, outFmt := range formats {
-			if debug {
+		for _, outFmt := range cfg.Formats {
+			if cfg.Debug {
 				fmt.Printf("Exporting for format %q\n", outFmt)
 			}
 			switch strings.ToLower(strings.TrimSpace(outFmt)) {
 			case "d", "direct": // Direct calling phonebook.
-				body, err := exp.Export(records.Entries, exporter.FormatDirect, activePfx, resolve, indicateActive, filterInactive, debug)
+				body, err := exp.Export(records.Entries, exporter.FormatDirect, cfg.ActivePfx, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive, cfg.Debug)
 				if err != nil {
 					return err
 				}
-				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_direct%s", outTgt, ext))
+				outpath := filepath.Join(cfg.Path, fmt.Sprintf("phonebook_%s_direct%s", outTgt, ext))
 				os.WriteFile(outpath, body, 0644)
 			case "p", "pbx": // PBX calling phonebook.
-				body, err := exp.Export(records.Entries, exporter.FormatPBX, activePfx, resolve, indicateActive, filterInactive, debug)
+				body, err := exp.Export(records.Entries, exporter.FormatPBX, cfg.ActivePfx, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive, cfg.Debug)
 				if err != nil {
 					return err
 				}
-				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_pbx%s", outTgt, ext))
+				outpath := filepath.Join(cfg.Path, fmt.Sprintf("phonebook_%s_pbx%s", outTgt, ext))
 				os.WriteFile(outpath, body, 0644)
 			case "c", "combined":
-				body, err := exp.Export(records.Entries, exporter.FormatCombined, activePfx, resolve, indicateActive, filterInactive, debug)
+				body, err := exp.Export(records.Entries, exporter.FormatCombined, cfg.ActivePfx, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive, cfg.Debug)
 				if err != nil {
 					return err
 				}
-				outpath := filepath.Join(path, fmt.Sprintf("phonebook_%s_combined%s", outTgt, ext))
+				outpath := filepath.Join(cfg.Path, fmt.Sprintf("phonebook_%s_combined%s", outTgt, ext))
 				os.WriteFile(outpath, body, 0644)
 			default:
 				return fmt.Errorf("unknown format: %q", outFmt)
@@ -198,7 +226,7 @@ func ignoreIdentityPfx(id string) bool {
 
 func getLocalIdentities() (map[string]bool, error) {
 	identities := map[string]bool{
-		AREDNLocalNode: true,
+		data.AREDNLocalNode: true,
 	}
 
 	if hn, err := os.Hostname(); err != nil {
@@ -208,8 +236,8 @@ func getLocalIdentities() (map[string]bool, error) {
 		hn = strings.Trim(hn, ".")
 		if !ignoreIdentityPfx(hn) {
 			identities[hn] = true
-			if !strings.HasSuffix(hn, AREDNDomain) {
-				identities[fmt.Sprintf("%s.%s", hn, AREDNDomain)] = true
+			if !strings.HasSuffix(hn, data.AREDNDomain) {
+				identities[fmt.Sprintf("%s.%s", hn, data.AREDNDomain)] = true
 			}
 		}
 	}
@@ -293,7 +321,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 
 	go func() {
 		for {
-			if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL, cfg.Debug); err != nil {
+			if err := refreshRecords(cfg); err != nil {
 				fmt.Printf("error refreshing data from upstream: %s\n", err)
 			}
 			time.Sleep(cfg.Reload)
@@ -332,10 +360,10 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 }
 
 func runLocal(cfg *configuration.Config) error {
-	if err := refreshRecords(cfg.Source, cfg.OLSRFile, cfg.SysInfoURL, cfg.Debug); err != nil {
+	if err := refreshRecords(cfg); err != nil {
 		return err
 	}
-	if err := exportOnce(cfg.Path, cfg.ActivePfx, cfg.Formats, cfg.Targets, cfg.Resolve, cfg.IndicateActive, cfg.FilterInactive, cfg.Debug); err != nil {
+	if err := exportOnce(cfg); err != nil {
 		return err
 	}
 
@@ -385,6 +413,7 @@ func main() {
 			IndicateActive:              *indicateActive,
 			FilterInactive:              *filterInactive,
 			ActivePfx:                   *activePfx,
+			IncludeRoutable:             *includeRoutable,
 			Port:                        *port,
 			Reload:                      *reload,
 			WebUser:                     *webUser,

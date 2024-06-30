@@ -15,7 +15,7 @@ import (
 	"github.com/arednch/phonebook/importer"
 )
 
-type ReloadFunc func(source, olsrFile, sysInfoURL string, debug bool) error
+type ReloadFunc func(cfg *configuration.Config) error
 
 type Server struct {
 	Config     *configuration.Config
@@ -202,6 +202,16 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rt := r.FormValue("routable")
+	rt = strings.ToLower(strings.TrimSpace(rt))
+	if rt != "" && rt != "true" && rt != "false" {
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: invalid routable value: %s\n", rt)
+		}
+		http.Error(w, "invalid routable value", http.StatusInternalServerError)
+		return
+	}
+
 	webuser := r.FormValue("webuser")
 	webuser = strings.TrimSpace(webuser)
 
@@ -251,6 +261,24 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "- \"debug\" now set to %t\n", debug)
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"debug\" now set to %t\n", debug)
+		}
+	}
+
+	if rt != "" {
+		routable := false
+		if rt == "true" {
+			routable = true
+		}
+
+		changed = true
+		s.Config.IncludeRoutable = routable
+		if cfg != nil {
+			cfg.IncludeRoutable = routable
+		}
+
+		fmt.Fprintf(w, "- \"include_routable\" now set to %t\n", routable)
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: \"include_routable\" now set to %t\n", routable)
 		}
 	}
 
@@ -312,7 +340,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
-	if err := s.ReloadFn(s.Config.Source, s.Config.OLSRFile, s.Config.SysInfoURL, s.Config.Debug); err != nil {
+	if err := s.ReloadFn(s.Config); err != nil {
 		if s.Config.Debug {
 			fmt.Printf("/reload: unable to reload phonebook: %s\n", err)
 		}

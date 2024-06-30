@@ -27,13 +27,14 @@ type Config struct {
 	AllowPermanentConfigChanges bool   `json:"allow_permanent_config_changes"`
 
 	// Only relevant when running in non-server / ad-hoc mode.
-	Path           string   `json:"path"`
-	Formats        []string `json:"formats"`
-	Targets        []string `json:"targets"`
-	Resolve        bool     `json:"resolve"`
-	IndicateActive bool     `json:"indicate_active"`
-	FilterInactive bool     `json:"filter_inactive"`
-	ActivePfx      string   `json:"active_pfx"`
+	Path            string   `json:"path"`
+	Formats         []string `json:"formats"`
+	Targets         []string `json:"targets"`
+	Resolve         bool     `json:"resolve"`
+	IndicateActive  bool     `json:"indicate_active"`
+	FilterInactive  bool     `json:"filter_inactive"`
+	ActivePfx       string   `json:"active_pfx"`
+	IncludeRoutable bool     `json:"include_routable"`
 
 	// Only relevant when running in server mode.
 	Port          int           `json:"port"`

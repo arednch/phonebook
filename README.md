@@ -19,6 +19,7 @@ Generally applicable:
 - `debug`: Print verbose debug messages on stdout when set to true. Default: false
 - `allow_runtime_config_changes`: Allows runtime config changes via web server when set to true.
 - `allow_permanent_config_changes`: Allows permanent config changes via web server when set to true.
+- `include_routable`: Adds other routable phone numbers even when not in the phonebook. Default: `false`
 
 Only relevant when running in **non-server / ad-hoc mode**:
 
@@ -159,6 +160,7 @@ A typical file would look like this:
 	"indicate_active": true,
 	"filter_inactive": false,
 	"active_pfx": "*",
+	"include_routable": true,
 	"port": 8081,
 	"reload_seconds": 3600,
 	"web_user": "aredn",
@@ -265,6 +267,8 @@ Optional parameters:
 	Important: Be careful with updating this as it may overload upstream servers (depending on what the "source" is set to). The default value has been chosen specifically with that in mind.
 
 - `debug`: Defines the debug output flag (set to "true" or "false"). See [flags](#flags) for more details.
+
+- `routable`: Defines if routable phone numbers should be included even if not in the phonebook. See [flags](#flags) for more details.
 
 - `webuser`: Defines the user required to authenticate via basicAuth for most web endpoints. See [flags](#flags) for more details.
 

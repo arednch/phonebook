@@ -20,8 +20,10 @@ func NameForEntry(entry *data.Entry, indicateActive bool, activePfx string) stri
 		pfx = activePfx
 	}
 	switch {
-	case entry.LastName == "" && entry.FirstName == "" && entry.Callsign == "":
+	case entry.LastName == "" && entry.FirstName == "" && entry.Callsign == "" && entry.PhoneNumber == "":
 		return ""
+	case entry.LastName == "" && entry.FirstName == "" && entry.Callsign == "":
+		return fmt.Sprintf("%s%s", pfx, entry.PhoneNumber)
 	case entry.LastName == "" && entry.FirstName == "":
 		return fmt.Sprintf("%s%s", pfx, entry.Callsign)
 	case entry.LastName == "":

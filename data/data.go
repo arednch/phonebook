@@ -7,6 +7,9 @@ import (
 
 const (
 	SIPSeparator = "@"
+
+	AREDNDomain    = "local.mesh"
+	AREDNLocalNode = "localnode.local.mesh" // AREDN default for local node
 )
 
 type ByName []*Entry

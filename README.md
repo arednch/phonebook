@@ -291,24 +291,24 @@ Optional parameters:
 
 ### Nodes
 
-|           | MikroTik hAP AC Lite | MikroTik hAP AC3  |
-|:----------|:--------------------:|:-----------------:|
-| SKU       | RB952Ui-5ac2nD       | RBD53iG-5HacD2HnD |
-| Target    | ath79                | ipq40xx           |
-| Arch      | MIPS                 | ARM Cortex        |
-| RAM       | 64MB                 | 256MB             |
-| Disk      | n/a                  | n/a               |
-| Phonebook | [🟢 (space constraint)](#hap-ac-lite-space) | 🟢                 |
+|           | MikroTik hAP AC Lite | MikroTik hAP AC3  | Ubiquiti NanoBeam 5AC Gen 2 |
+|:----------|:--------------------:|:-----------------:|:---------------------------:|
+| SKU       | RB952Ui-5ac2nD       | RBD53iG-5HacD2HnD | n/a                         |
+| Target    | ath79                | ipq40xx           | ath79                       |
+| Arch      | MIPS                 | ARM Cortex        | MIPS                        |
+| RAM       | 64MB                 | 256MB             | 128MB                       |
+| Phonebook | 🟢                   | 🟢                | 🟢                           |
+
+Note: Some devices do not have a lot of space (e.g. hAP Lite). If you run into problems:
+
+  - Make sure you use the latest version (specifically, at least [v1.8.1](https://github.com/arednch/packages/releases/tag/v1.8.1) which provides a packed/smaller binary).
+	- If the above didn't help: Make sure to uninstall other packages.
+	- If the above didn't help: Uninstall previous versions of the phonebook before firmware upgrades or installing the latest version.
+	- If the above didn't help: Reinstall the firmware from scratch (without keeping the configuration).
 
 **Known Limitations**:
 
 Note: This list is dynamic and we update it as well as possible but it's likely incomplete and not always up to date with the latest developments. If you have updates, please let us know.
-
-- <a id="hap-ac-lite-space">hAP AC Lite (Space)</a>: There is a small amount of space left on this device and thus installing the phonebook occasionally leads to space problems. If you're running into problems:
-
-	- Make sure to uninstall other packages,
-	- Uninstall previous versions of the phonebook,
-	- Or worst case, reinstall the firmware from scratch (without keeping the configuration).
 
 ### Phones
 

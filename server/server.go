@@ -19,14 +19,6 @@ import (
 
 type ReloadFunc func(cfg *configuration.Config) error
 
-type Index struct {
-	Version string
-}
-
-type Info struct {
-	Version string `json:"version"`
-}
-
 func NewServer(cfg *configuration.Config, cfgPath, version string, records *data.Records, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, tmpls *template.Template) *Server {
 	return &Server{
 		Version:    version,
@@ -76,7 +68,7 @@ func (s *Server) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
-	data := Index{
+	data := data.WebIndex{
 		Version: s.Version,
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
@@ -86,7 +78,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
-	data, err := json.Marshal(&Info{
+	data, err := json.Marshal(&data.WebInfo{
 		Version: s.Version,
 	})
 	if err != nil {
@@ -388,16 +380,22 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
+	data := data.WebReload{
+		Version: s.Version,
+		Source:  s.Config.Source,
+		Success: true,
+	}
 	if err := s.ReloadFn(s.Config); err != nil {
 		if s.Config.Debug {
 			fmt.Printf("/reload: unable to reload phonebook: %s\n", err)
 		}
-		http.Error(w, "unable to reload phonebook", http.StatusInternalServerError)
-		return
-	}
-	fmt.Fprintf(w, "phonebook reloaded locally from %q", s.Config.Source)
-	if s.Config.Debug {
+		data.Success = false
+	} else if s.Config.Debug {
 		fmt.Printf("/reload: phonebook reloaded locally from %q\n", s.Config.Source)
+	}
+	if err := s.Tmpls.ExecuteTemplate(w, "reload.html", data); err != nil {
+		http.Error(w, "unable to write response", http.StatusInternalServerError)
+		return
 	}
 }
 

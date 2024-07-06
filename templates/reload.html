@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Phonebook: Reload</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+	</head>
+
+  <body>
+    <script src="/static/bootstrap.bundle.min.js"></script>
+
+		<div class="container">
+      <div class="row">
+        <div class="col">
+          <h1>Phonebook: Reload</h1>
+        </div>
+      </div> 
+      <div class="alert alert-secondary">
+        <div class="row">
+          <div class="col"> 
+            Version {{ .Version }}
+          </div>
+        </div>
+      </div>
+
+      {{ if .Success }}
+        <div class="alert alert-success">
+          <div class="row">
+            <div class="col">
+              Phonebook reloaded locally from {{ .Source }}
+            </div>
+          </div>
+        </div>
+      {{ else }}
+      <div class="alert alert-danger">
+        <div class="row">
+          <div class="col">
+            Unable to reload phonebook from {{ .Source }}
+          </div>
+        </div>
+      </div>
+      {{ end }}
+
+  </body>
+</html>

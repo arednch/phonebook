@@ -74,6 +74,7 @@ func (s *Server) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	data := data.WebIndex{
 		Version: s.Version.Version,
+		Updated: s.Records.Updated.Format(time.RFC3339),
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -494,6 +495,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
 	data := data.WebReload{
 		Version: s.Version.Version,
+		Updated: s.Records.Updated.Format(time.RFC3339),
 		Source:  s.Config.Source,
 		Success: true,
 	}

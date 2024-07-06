@@ -23,16 +23,20 @@ type RecordStats struct {
 
 type WebIndex struct {
 	Version string
+	Updated string
 }
 
 type WebReload struct {
 	Version string
+	Updated string
+
 	Source  string
 	Success bool
 }
 
 type WebShowConfig struct {
-	Version  string
+	Version string
+
 	Messages []string
 	Content  string
 	Diff     bool
@@ -40,7 +44,8 @@ type WebShowConfig struct {
 }
 
 type WebUpdateConfig struct {
-	Version  string
+	Version string
+
 	Messages []string
 	Success  bool
 }

@@ -19,15 +19,17 @@ import (
 
 type ReloadFunc func(cfg *configuration.Config) error
 
-func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, tmpls *template.Template) *Server {
+func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template) *Server {
 	return &Server{
-		Version:    version,
-		Config:     cfg,
-		ConfigPath: cfgPath,
-		Records:    records,
-		Exporters:  exporters,
-		ReloadFn:   refreshRecords,
-		Tmpls:      tmpls,
+		Version:       version,
+		Config:        cfg,
+		ConfigPath:    cfgPath,
+		Records:       records,
+		RuntimeInfo:   runtimeInfo,
+		Exporters:     exporters,
+		RegisterCache: registerCache,
+		ReloadFn:      refreshRecords,
+		Tmpls:         tmpls,
 	}
 }
 
@@ -36,8 +38,10 @@ type Server struct {
 	Config     *configuration.Config
 	ConfigPath string // optional when using config file
 
-	Records   *data.Records
-	Exporters map[string]exporter.Exporter
+	RuntimeInfo   *data.RuntimeInfo
+	Records       *data.Records
+	Exporters     map[string]exporter.Exporter
+	RegisterCache *data.TTLCache[string, *data.SIPClient]
 
 	ReloadFn ReloadFunc
 
@@ -77,9 +81,38 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
-	data, err := json.Marshal(&data.WebInfo{
+	s.Records.Mu.RLock()
+	defer s.Records.Mu.RUnlock()
+	info := &data.WebInfo{
 		Version: *s.Version,
-	})
+		RecordStats: data.RecordStats{
+			Count:   len(s.Records.Entries),
+			Updated: s.Records.Updated,
+		},
+	}
+
+	if s.RegisterCache != nil {
+		info.Registered = s.RegisterCache.Keys()
+	}
+
+	if s.RuntimeInfo != nil && s.RuntimeInfo.SysInfo != nil {
+		s.RuntimeInfo.Mu.RLock()
+		defer s.RuntimeInfo.Mu.RUnlock()
+		info.Runtime = data.Runtime{
+			Updated: s.RuntimeInfo.Updated,
+		}
+		if s.RuntimeInfo.SysInfo.Node != "" {
+			info.Runtime.Node = s.RuntimeInfo.SysInfo.Node
+		}
+		if s.RuntimeInfo.SysInfo.System.Uptime != "" {
+			info.Runtime.Uptime = s.RuntimeInfo.SysInfo.System.Uptime
+		}
+		if s.RuntimeInfo.SysInfo.NodeDetails != nil {
+			info.Runtime.Details = *s.RuntimeInfo.SysInfo.NodeDetails
+		}
+	}
+
+	data, err := json.Marshal(info)
 	if err != nil {
 		http.Error(w, "unable to marshal info", http.StatusInternalServerError)
 		return

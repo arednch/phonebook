@@ -3,7 +3,6 @@ package olsr
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"regexp"
 	"strings"
 
@@ -22,17 +21,7 @@ var (
 	phoneHostnameRE = regexp.MustCompile(`^[0-9]+$`)
 )
 
-func ReadFromURL(url string) (map[string]*data.OLSR, error) {
-	b, err := importer.ReadFromURL(url)
-	if err != nil {
-		return nil, err
-	}
-
-	var sysinfo data.SysInfo
-	if err := json.Unmarshal(b, &sysinfo); err != nil {
-		return nil, err
-	}
-
+func ReadFromSysInfo(sysinfo *data.SysInfo) (map[string]*data.OLSR, error) {
 	d := map[string]*data.OLSR{}
 	for _, host := range sysinfo.Hosts {
 		if filterNonPhones && !phoneHostnameRE.MatchString(host.Name) {

@@ -1,5 +1,16 @@
 package data
 
+import (
+	"sync"
+	"time"
+)
+
+type RuntimeInfo struct {
+	Mu      *sync.RWMutex
+	Updated time.Time
+	SysInfo *SysInfo
+}
+
 type SysInfo struct {
 	APIVersion string `json:"api_version"`
 

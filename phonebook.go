@@ -66,15 +66,17 @@ var (
 
 const (
 	defaultExtension = ".xml"
+	sysInfoReload    = 5 * time.Minute
 )
 
 var (
 	// Compile time flags (LDFLAGS)
-	Version   string
-	CommitSHA string
+	Version   = "dev"
+	CommitSHA = "-"
 
-	records   *data.Records
-	exporters map[string]exporter.Exporter
+	runtimeInfo *data.RuntimeInfo
+	records     *data.Records
+	exporters   map[string]exporter.Exporter
 
 	extensions = map[string]string{
 		"vcard": ".vcf",
@@ -130,6 +132,18 @@ func mergePhonebookWithRouting(records []*data.Entry, hostData map[string]*data.
 	return append(records, routableEntries...)
 }
 
+func refreshSysinfo(cfg *configuration.Config) error {
+	si, err := importer.ReadSysInfoFromURL(cfg.SysInfoURL)
+	if err != nil {
+		return fmt.Errorf("error reading sysinfo from %q: %s", cfg.SysInfoURL, err)
+	}
+	runtimeInfo.Mu.Lock()
+	defer runtimeInfo.Mu.Unlock()
+	runtimeInfo.SysInfo = si
+	runtimeInfo.Updated = time.Now()
+	return nil
+}
+
 func refreshRecords(cfg *configuration.Config) error {
 	if cfg.Debug {
 		fmt.Printf("Reading phonebook from %q\n", cfg.Source)
@@ -139,16 +153,18 @@ func refreshRecords(cfg *configuration.Config) error {
 		return fmt.Errorf("error reading phonebook: %s", err)
 	}
 
+	runtimeInfo.Mu.Lock()
+	defer runtimeInfo.Mu.Unlock()
 	var hostData map[string]*data.OLSR
 	switch {
-	case cfg.OLSRFile == "" && cfg.SysInfoURL == "":
-		fmt.Println("not reading network information: neither OLSR file nor sysinfo URL specified")
+	case cfg.OLSRFile == "" && runtimeInfo.SysInfo == nil:
+		fmt.Println("not reading network information: no OLSR file nor sysinfo available")
 		return nil
 
-	case cfg.SysInfoURL != "":
-		hostData, err = olsr.ReadFromURL(cfg.SysInfoURL)
+	case runtimeInfo.SysInfo != nil:
+		hostData, err = olsr.ReadFromSysInfo(runtimeInfo.SysInfo)
 		if err != nil {
-			return fmt.Errorf("error reading OLSR data from sysinfo URL %q: %s", cfg.SysInfoURL, err)
+			return fmt.Errorf("error reading OLSR data from sysinfo: %s", err)
 		}
 
 	case cfg.OLSRFile != "":
@@ -167,6 +183,7 @@ func refreshRecords(cfg *configuration.Config) error {
 	records.Mu.Lock()
 	defer records.Mu.Unlock()
 	records.Entries = rec
+	records.Updated = time.Now()
 
 	return nil
 }
@@ -300,6 +317,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 		}()
 	}
 
+	var sipSrv *sip.Server
 	if cfg.SIPServer {
 		identities, err := getLocalIdentities()
 		if err != nil {
@@ -313,7 +331,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 				fmt.Printf("  - %s\n", k)
 			}
 		}
-		s := &sip.Server{
+		sipSrv = &sip.Server{
 			Config:          cfg,
 			Records:         records,
 			RegisterCache:   data.NewTTL[string, *data.SIPClient](),
@@ -324,8 +342,19 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 			if cfg.Debug {
 				fmt.Println("Starting SIP Listener")
 			}
-			if err := s.ListenAndServe(ctx, "udp", fmt.Sprintf(":%d", cfg.SIPPort)); err != nil {
+			if err := sipSrv.ListenAndServe(ctx, "udp", fmt.Sprintf(":%d", cfg.SIPPort)); err != nil {
 				fmt.Printf("SIP server failed: %s\n", err)
+			}
+		}()
+	}
+
+	if cfg.SysInfoURL != "" {
+		go func() {
+			for {
+				if err := refreshSysinfo(cfg); err != nil {
+					fmt.Printf("error refreshing sysinfo: %s\n", err)
+				}
+				time.Sleep(sysInfoReload)
 			}
 		}()
 	}
@@ -340,7 +369,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 	}()
 
 	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
-	srv := server.NewServer(cfg, cfgPath, ver, records, exporters, refreshRecords, tmpls)
+	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, refreshRecords, sipSrv.RegisterCache, tmpls)
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
 	if cfg.WebUser != "" && cfg.WebPwd != "" {
 		if cfg.Debug {
@@ -374,6 +403,9 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 }
 
 func runLocal(cfg *configuration.Config) error {
+	if err := refreshSysinfo(cfg); err != nil {
+		return err
+	}
 	if err := refreshRecords(cfg); err != nil {
 		return err
 	}
@@ -391,6 +423,9 @@ func main() {
 	fmt.Printf("phonebook starting %q\n", Version)
 
 	records = &data.Records{
+		Mu: &sync.RWMutex{},
+	}
+	runtimeInfo = &data.RuntimeInfo{
 		Mu: &sync.RWMutex{},
 	}
 	exporters = map[string]exporter.Exporter{

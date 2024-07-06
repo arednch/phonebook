@@ -52,6 +52,25 @@ func NewTTL[K comparable, V any]() *TTLCache[K, V] {
 	return c
 }
 
+func (c *TTLCache[K, V]) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return len(c.items)
+}
+
+func (c *TTLCache[K, V]) Keys() []K {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var ks []K
+	for k := range c.items {
+		ks = append(ks, k)
+	}
+
+	return ks
+}
+
 // Set adds a new item to the cache with the specified key, value, and
 // time-to-live (TTL).
 func (c *TTLCache[K, V]) Set(key K, value V, ttl time.Duration) {

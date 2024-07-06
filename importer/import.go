@@ -3,6 +3,7 @@ package importer
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -109,4 +110,18 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 	}
 
 	return records, nil
+}
+
+func ReadSysInfoFromURL(url string) (*data.SysInfo, error) {
+	b, err := ReadFromURL(url)
+	if err != nil {
+		return nil, err
+	}
+
+	var sysinfo data.SysInfo
+	if err := json.Unmarshal(b, &sysinfo); err != nil {
+		return nil, err
+	}
+
+	return &sysinfo, nil
 }

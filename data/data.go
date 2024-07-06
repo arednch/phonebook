@@ -3,6 +3,7 @@ package data
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 const (
@@ -40,6 +41,7 @@ type Version struct {
 
 type Records struct {
 	Mu      *sync.RWMutex
+	Updated time.Time
 	Entries []*Entry
 }
 

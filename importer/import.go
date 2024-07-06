@@ -13,7 +13,11 @@ import (
 )
 
 const (
-	eofSignal = "ENDOFFILE"
+	headerFirstName   = "first_name"
+	headerLastName    = "name"
+	headerCallsign    = "callsign"
+	headerPhoneNumber = "telephone"
+	headerPrivate     = "privat"
 )
 
 func ReadFromURL(url string) ([]byte, error) {
@@ -48,8 +52,33 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 	}
 
 	reader := csv.NewReader(bytes.NewBuffer(blob))
+	// read and index headers
+	hdrs, err := reader.Read()
+	if err != nil {
+		return nil, err
+	}
+	headers := make(map[string]int)
+	for i, v := range hdrs {
+		headers[strings.ToLower(v)] = i
+	}
+	firstIdx, ok := headers[headerFirstName]
+	if !ok {
+		return nil, errors.New("unable to locate first name column in CSV")
+	}
+	lastIdx, ok := headers[headerLastName]
+	if !ok {
+		return nil, errors.New("unable to locate last name column in CSV")
+	}
+	callIdx, ok := headers[headerCallsign]
+	if !ok {
+		return nil, errors.New("unable to locate callsign column in CSV")
+	}
+	phoneIdx, ok := headers[headerPhoneNumber]
+	if !ok {
+		return nil, errors.New("unable to locate phone number column in CSV")
+	}
+	privateIdx, privateIdxAvailable := headers[headerPrivate]
 
-	var count int
 	var records []*data.Entry
 	for {
 		r, err := reader.Read()
@@ -60,38 +89,21 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 			return nil, err
 		}
 
-		count++
-		// skip header
-		if count == 1 {
-			continue
-		}
-		// phonebook's last line seems to contain an EOF flag
-		if strings.EqualFold(r[0], eofSignal) {
-			break
-		}
-		// also skip if we encounter the first empty line
-		if strings.TrimSpace(r[0]) == "" && strings.TrimSpace(r[1]) == "" &&
-			strings.TrimSpace(r[2]) == "" && strings.TrimSpace(r[3]) == "" &&
-			strings.TrimSpace(r[4]) == "" {
+		// skip if we encounter the first empty line
+		if strings.TrimSpace(r[firstIdx]) == "" && strings.TrimSpace(r[lastIdx]) == "" &&
+			strings.TrimSpace(r[callIdx]) == "" && strings.TrimSpace(r[phoneIdx]) == "" {
 			break
 		}
 		// check if entry is marked as private and if so, skip it
-		if len(r) > 11 && strings.TrimSpace(r[11]) == "Y" {
+		if privateIdxAvailable && strings.ToLower(strings.TrimSpace(r[privateIdx])) == "y" {
 			continue
 		}
 
 		entry := &data.Entry{
-			FirstName:   strings.TrimSpace(r[0]),
-			LastName:    strings.TrimSpace(r[1]),
-			Callsign:    strings.TrimSpace(r[2]),
-			PhoneNumber: strings.TrimSpace(r[4]),
-		}
-		if len(r) > 9 {
-			entry.Email = strings.TrimSpace(r[5])
-			entry.Club = strings.TrimSpace(r[6])
-			entry.Mobile = strings.TrimSpace(r[7])
-			entry.Street = strings.TrimSpace(r[8])
-			entry.City = strings.TrimSpace(r[9])
+			FirstName:   strings.TrimSpace(r[firstIdx]),
+			LastName:    strings.TrimSpace(r[lastIdx]),
+			Callsign:    strings.TrimSpace(r[callIdx]),
+			PhoneNumber: strings.TrimSpace(r[phoneIdx]),
 		}
 		records = append(records, entry)
 	}

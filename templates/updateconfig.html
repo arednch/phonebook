@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>Phonebook: Show Config</title>
+		<title>Phonebook: Update Config</title>
     <link href="/static/bootstrap.min.css" rel="stylesheet">
 	</head>
 
@@ -13,7 +13,7 @@
 		<div class="container">
       <div class="row">
         <div class="col">
-          <h1>Phonebook: Show Config</h1>
+          <h1>Phonebook: Update Config</h1>
         </div>
       </div> 
       <div class="alert alert-secondary">
@@ -30,7 +30,7 @@
         <div class="alert alert-danger">
           <div class="row">
             <div class="col">
-              Unable to show config
+              Unable to update config
             </div>
           </div>
       {{ end }}
@@ -43,24 +43,7 @@
         </div>
       {{ end }}
 
-      {{ if .Content }}
-        <div class="row">
-          <div class="col">
-            <pre><code>{{ .Content }}</code></pre>
-          </div>
-        </div>
-      {{ end }}
     </div>
-
-    {{ if .Diff }}
-      <div class="row">
-        <div class="col">
-          Legend:<br>
-           - items in runtime config but not on disk<br>
-          + items in disk config but not runtime<br>
-        </div>
-      </div>
-    {{ end }}
 
   </body>
 </html>

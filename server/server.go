@@ -186,11 +186,20 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
+	data := data.WebUpdateConfig{
+		Version: s.Version,
+		Success: true,
+	}
+
 	if !s.Config.AllowRuntimeConfigChanges {
+		data.Success = false
 		if s.Config.Debug {
 			fmt.Println("/updateconfig: updating config is not allowed by config")
 		}
-		http.Error(w, "updating config is not allowed by config flag (-allow_runtime_config_changes)", http.StatusInternalServerError)
+		data.Messages = append(data.Messages, "updating config is not allowed by config flag (-allow_runtime_config_changes)")
+		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -201,10 +210,14 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		permanent = true
 	}
 	if permanent && !s.Config.AllowPermanentConfigChanges {
+		data.Success = false
 		if s.Config.Debug {
 			fmt.Println("/updateconfig: updating config on disk is not allowed by config")
 		}
-		http.Error(w, "updating config on disk is not allowed by config flag (-allow_permanent_config_changes)", http.StatusInternalServerError)
+		data.Messages = append(data.Messages, "updating config on disk is not allowed by config flag (-allow_permanent_config_changes)")
+		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -212,19 +225,23 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var cfg *configuration.Config
 	switch {
 	case s.ConfigPath == "":
-		fmt.Fprintln(w, "phonebook was not started with a config path set ('-conf' flag) so config file won't be updated")
+		data.Messages = append(data.Messages, "phonebook was not started with a config path set ('-conf' flag) so config file won't be updated")
 	case !permanent:
-		fmt.Fprintln(w, "phonebook config changes are not going to be written to disk")
+		data.Messages = append(data.Messages, "phonebook config changes are not going to be written to disk")
 	default:
 		var err error
 		if cfg, err = configuration.ReadFromJSON(s.ConfigPath); err != nil {
+			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: unable to read config: %s\n", err)
 			}
-			http.Error(w, "unable to read config", http.StatusInternalServerError)
+			data.Messages = append(data.Messages, "unable to read config")
+			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
-		fmt.Fprintln(w, "phonebook config changes will be reflected in", s.ConfigPath)
+		data.Messages = append(data.Messages, fmt.Sprintf("phonebook config changes will be reflected in %q", s.ConfigPath))
 	}
 
 	// Check for supported fields to update and verify.
@@ -232,10 +249,14 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	src = strings.TrimSpace(src)
 	if src != "" {
 		if _, err := importer.ReadPhonebook(src); err != nil {
+			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: specified source is not readable: %s\n", err)
 			}
-			http.Error(w, "specified source cannot be read, make sure it exists and is either a valid, absolute file path or http/https URL", http.StatusInternalServerError)
+			data.Messages = append(data.Messages, "specified source cannot be read, make sure it exists and is either a valid, absolute file path or http/https URL")
+			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
 	}
@@ -247,17 +268,25 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		var err error
 		reload, err = strconv.Atoi(rs)
 		if err != nil {
+			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: invalid reload value: %s\n", rs)
 			}
-			http.Error(w, "invalid reload value", http.StatusInternalServerError)
+			data.Messages = append(data.Messages, "invalid reload value")
+			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
 		if reload < configuration.MinimalReloadSeconds || reload > configuration.MaxReloadSeconds {
+			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: reload value too high or low (<%d or >%d): %s\n", configuration.MinimalReloadSeconds, configuration.MaxReloadSeconds, rs)
 			}
-			http.Error(w, "reload value too high or low", http.StatusInternalServerError)
+			data.Messages = append(data.Messages, fmt.Sprintf("reload value too high or low (<%d or >%d)", configuration.MinimalReloadSeconds, configuration.MaxReloadSeconds))
+			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
 	}
@@ -268,17 +297,24 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: invalid debug value: %s\n", dbg)
 		}
-		http.Error(w, "invalid debug value", http.StatusInternalServerError)
+		data.Messages = append(data.Messages, "invalid debug value")
+		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	rt := r.FormValue("routable")
 	rt = strings.ToLower(strings.TrimSpace(rt))
 	if rt != "" && rt != "true" && rt != "false" {
+		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: invalid routable value: %s\n", rt)
 		}
-		http.Error(w, "invalid routable value", http.StatusInternalServerError)
+		data.Messages = append(data.Messages, "invalid routable value")
+		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -295,7 +331,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if cfg != nil {
 			cfg.Source = src
 		}
-		fmt.Fprintf(w, "- \"source\" now set to %q\n", src)
+		data.Messages = append(data.Messages, fmt.Sprintf("- \"source\" now set to %q", src))
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"source\" now set to %q\n", src)
 		}
@@ -310,7 +346,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.ReloadSeconds = reload
 			cfg.Reload = rd
 		}
-		fmt.Fprintf(w, "- reload duration now set to %d seconds (%s)\n", reload, rd)
+		data.Messages = append(data.Messages, fmt.Sprintf("- reload duration now set to %d seconds (%s)", reload, rd))
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: reload duration now set to %d seconds (%s)\n", reload, rd)
 		}
@@ -328,7 +364,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.Debug = debug
 		}
 
-		fmt.Fprintf(w, "- \"debug\" now set to %t\n", debug)
+		data.Messages = append(data.Messages, fmt.Sprintf("- \"debug\" now set to %t", debug))
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"debug\" now set to %t\n", debug)
 		}
@@ -346,7 +382,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.IncludeRoutable = routable
 		}
 
-		fmt.Fprintf(w, "- \"include_routable\" now set to %t\n", routable)
+		data.Messages = append(data.Messages, fmt.Sprintf("- \"include_routable\" now set to %t", routable))
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"include_routable\" now set to %t\n", routable)
 		}
@@ -359,7 +395,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.WebUser = webuser
 		}
 
-		fmt.Fprintf(w, "- \"web_user\" now set to %q\n", webuser)
+		data.Messages = append(data.Messages, fmt.Sprintf("- \"web_user\" now set to %q", webuser))
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"web_user\" now set to %q\n", webuser)
 		}
@@ -372,7 +408,10 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.WebPwd = webpwd
 		}
 
-		fmt.Fprintf(w, "- \"web_pwd\" now set\n")
+		data.Messages = append(data.Messages, "- \"web_pwd\" now set")
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: \"web_user\" now set to %q\n", webuser)
+		}
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: \"web_pwd\" now set\n")
 		}
@@ -380,9 +419,12 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Exit early if we didn't make any changes (avoid unnecessary disk writes etc).
 	if !changed {
-		fmt.Fprintln(w, "no changes were made")
+		data.Messages = append(data.Messages, "no changes were made")
 		if s.Config.Debug {
 			fmt.Println("/updateconfig: no changes were made")
+		}
+		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
 		}
 		return
 	}
@@ -390,22 +432,29 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Finally writing the changes if there are any.
 	if cfg != nil {
 		if err := configuration.WriteToJSON(cfg, s.ConfigPath, false); err != nil {
+			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: unable to write config: %s\n", err)
 			}
-			http.Error(w, "unable to write config", http.StatusInternalServerError)
+			data.Messages = append(data.Messages, "unable to write config")
+			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
 
-		fmt.Fprintf(w, "phonebook config updated in %q\n", s.ConfigPath)
+		data.Messages = append(data.Messages, fmt.Sprintf("phonebook config updated in %q", s.ConfigPath))
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: phonebook config updated in %q\n", s.ConfigPath)
 		}
 	} else {
-		fmt.Fprintln(w, "only phonebook runtime (!) config updated")
+		data.Messages = append(data.Messages, "only phonebook runtime (!) config updated")
 		if s.Config.Debug {
 			fmt.Println("/updateconfig: only phonebook runtime (!) config updated")
 		}
+	}
+	if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+		http.Error(w, "unable to write response", http.StatusInternalServerError)
 	}
 }
 

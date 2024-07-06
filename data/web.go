@@ -21,3 +21,9 @@ type WebShowConfig struct {
 	Diff     bool
 	Success  bool
 }
+
+type WebUpdateConfig struct {
+	Version  string
+	Messages []string
+	Success  bool
+}

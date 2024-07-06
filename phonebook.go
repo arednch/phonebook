@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"flag"
 	"fmt"
+	"html/template"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -66,6 +69,7 @@ const (
 )
 
 var (
+	Version   string
 	records   *data.Records
 	exporters map[string]exporter.Exporter
 
@@ -77,6 +81,10 @@ var (
 		"fe80::",
 		"::1",
 	}
+
+	//go:embed templates/*
+	//go:embed resources/*
+	webFS embed.FS
 )
 
 func mergePhonebookWithRouting(records []*data.Entry, hostData map[string]*data.OLSR, cfg *configuration.Config) []*data.Entry {
@@ -268,7 +276,7 @@ func getLocalIdentities() (map[string]bool, error) {
 	return identities, nil
 }
 
-func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) error {
+func runServer(ctx context.Context, cfg *configuration.Config, cfgPath, version string) error {
 	if cfg.Source == "" {
 		return errors.New("source needs to be set")
 	}
@@ -328,18 +336,21 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string) e
 		}
 	}()
 
-	srv := &server.Server{
-		Config:     cfg,
-		ConfigPath: cfgPath,
-		Records:    records,
-		Exporters:  exporters,
-		ReloadFn:   refreshRecords,
-	}
+	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
+	srv := server.NewServer(cfg, cfgPath, version, records, exporters, refreshRecords, tmpls)
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
 	if cfg.WebUser != "" && cfg.WebPwd != "" {
 		if cfg.Debug {
 			fmt.Println("protecting most web endpoints with configured basicAuth user/pwd")
 		}
+		resFS, err := fs.Sub(webFS, "resources")
+		if err != nil {
+			return err
+		}
+		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
+		http.HandleFunc("/", srv.Index)
+		http.HandleFunc("/index.html", srv.Index)
+		http.HandleFunc("/info", srv.Info)
 		http.HandleFunc("/reload", srv.BasicAuth(srv.ReloadPhonebook))
 		http.HandleFunc("/showconfig", srv.BasicAuth(srv.ShowConfig))
 		http.HandleFunc("/updateconfig", srv.BasicAuth(srv.UpdateConfig))
@@ -374,6 +385,8 @@ func main() {
 	ctx := context.Background()
 	// Parse flags globally.
 	flag.Parse()
+	fmt.Printf("phonebook starting %q\n", Version)
+
 	records = &data.Records{
 		Mu: &sync.RWMutex{},
 	}
@@ -448,7 +461,7 @@ func main() {
 		if *debug {
 			fmt.Println("Running phonebook in server mode")
 		}
-		if err := runServer(ctx, cfg, *conf); err != nil {
+		if err := runServer(ctx, cfg, *conf, Version); err != nil {
 			fmt.Printf("unable to run server: %s\n", err)
 			os.Exit(1)
 		}

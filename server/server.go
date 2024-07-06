@@ -3,7 +3,9 @@ package server
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,7 +19,28 @@ import (
 
 type ReloadFunc func(cfg *configuration.Config) error
 
+type Index struct {
+	Version string
+}
+
+type Info struct {
+	Version string `json:"version"`
+}
+
+func NewServer(cfg *configuration.Config, cfgPath, version string, records *data.Records, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, tmpls *template.Template) *Server {
+	return &Server{
+		Version:    version,
+		Config:     cfg,
+		ConfigPath: cfgPath,
+		Records:    records,
+		Exporters:  exporters,
+		ReloadFn:   refreshRecords,
+		Tmpls:      tmpls,
+	}
+}
+
 type Server struct {
+	Version    string
 	Config     *configuration.Config
 	ConfigPath string // optional when using config file
 
@@ -25,6 +48,8 @@ type Server struct {
 	Exporters map[string]exporter.Exporter
 
 	ReloadFn ReloadFunc
+
+	Tmpls *template.Template
 }
 
 func (s *Server) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -48,6 +73,27 @@ func (s *Server) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 	})
+}
+
+func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
+	data := Index{
+		Version: s.Version,
+	}
+	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
+		http.Error(w, "unable to write response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
+	data, err := json.Marshal(&Info{
+		Version: s.Version,
+	})
+	if err != nil {
+		http.Error(w, "unable to marshal info", http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
 }
 
 func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
@@ -162,12 +208,14 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Check for supported fields to update and verify.
 	src := r.FormValue("source")
 	src = strings.TrimSpace(src)
-	if _, err := importer.ReadPhonebook(src); err != nil {
-		if s.Config.Debug {
-			fmt.Printf("/updateconfig: specified source is not readable: %s\n", err)
+	if src != "" {
+		if _, err := importer.ReadPhonebook(src); err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/updateconfig: specified source is not readable: %s\n", err)
+			}
+			http.Error(w, "specified source cannot be read, make sure it exists and is either a valid, absolute file path or http/https URL", http.StatusInternalServerError)
+			return
 		}
-		http.Error(w, "specified source cannot be read, make sure it exists and is either a valid, absolute file path or http/https URL", http.StatusInternalServerError)
-		return
 	}
 
 	var reload int

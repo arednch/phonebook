@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Phonebook</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+	</head>
+
+  <body>
+    <script src="/static/bootstrap.bundle.min.js"></script>
+
+		<div class="container">
+      <div class="row">
+        <div class="col">
+          <h1>Phonebook</h1>
+        </div>
+      </div> 
+      <div class="alert alert-secondary">
+        <div class="row">
+          <div class="col"> 
+            Version {{ .Version }}
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-info">
+        <div class="row">
+          <div class="col"> 
+            <h3>Show phonebook entries</h3>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <form action="/phonebook">
+
+              <div class="form-floating mb-3">
+                <input class="form-control" type="text" id="format" name="format" value="direct" placeholder="Format (e.g. direct, pbx, combined)">
+                <label class="form-label" for="format">Format (e.g. direct, pbx, combined)</label>
+              </div>
+
+              <div class="form-floating mb-3">
+                <input class="form-control" type="text" id="target" name="target" value="generic" placeholder="Target (e.g. generic, yaesu, grandstream, vcard)">
+                <label class="form-label" for="target">Target (e.g. generic, yaesu, grandstream, vcard)</label>
+              </div>
+
+              <p>Optional</p>
+
+              <div class="mb-3">
+                <input class="form-check-input" type="checkbox" id="indicateActive" name="ia" value="true">
+                <label class="form-check-label" for="indicateActive">Indicate active phones</label>
+              </div>
+
+              <div class="mb-3">
+                <input class="form-check-input" type="checkbox" id="resolve" name="resolve" value="true">
+                <label class="form-check-label" for="resolve">Resolve hostnames to IPs</label>
+              </div>
+
+              <div class="mb-3">
+                <input class="form-check-input" type="checkbox" id="filterInactive" name="fi" value="true">
+                <label class="form-check-label" for="filterInactive">Filter inactive phones</label>
+              </div>
+
+              <div class="mb-3">
+                <input class="btn btn-primary" type="submit" value="Show phonebook">
+              </div>
+
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-danger">
+        <div class="row">
+          <div class="col"> 
+            <h2>Admin / Configuration options</h2>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col"> 
+            <b>Use at your own risk!</b>
+          </div>
+        </div>
+
+        <div class="alert alert-info">
+          <div class="row">
+            <div class="col">
+              <h3><a href="/reload">Force reload data from source</a></h3>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-info">
+          <div class="row">
+            <div class="col"> 
+              <h3>Show configuration</h3>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col">
+              <form action="/showconfig">
+
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="configTypeDisk" name="type" value="disk">
+                  <label class="form-check-label" for="configTypeDisk">Disk</label>
+                </div>
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="configTypeRuntime" name="type" value="runtime">
+                  <label class="form-check-label" for="configTypeRuntime">Runtime</label>
+                </div>
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="configTypeDiff" name="type" value="diff">
+                  <label class="form-check-label" for="configTypeDiff">Diff between disk and runtime</label>
+                </div>
+
+                <div class="mb-3">
+                  <input class="btn btn-primary" type="submit" value="Show configuration">
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-warning">
+          <div class="row">
+            <div class="col"> 
+              <h3>Update configuration</h3><br>
+              <b>All settings below are optional.</b>
+            </div>
+          </div>
+
+          <form action="/updateconfig">
+
+            <div class="row">
+              <div class="col">
+                Time between reloads from source in seconds
+              </div>
+              <div class="col">
+                <div class="form-floating mb-3">
+                  <input class="form-control" type="text" id="changeReload" name="reload" value="" placeholder="Time between reloads from source in seconds">
+                  <label class="form-label" for="changeReload">Time between reloads from source in seconds</label>
+                </div>
+              </div>
+            </div>
+            
+            <div class="row">
+              <div class="col">
+                Source to load phonebook from (must return a CSV file)
+              </div>
+              <div class="col">
+                <div class="form-floating mb-3">
+                  <input class="form-control" type="text" id="changeSource" name="source" value="" placeholder="Source to load phonebook from (must return a CSV file)">
+                  <label class="form-label" for="changeSource">Source to load phonebook from (must return a CSV file)</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col">
+                Include routable phones in phonebook.
+              </div>
+              <div class="col">
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="changeRoutableTrue" name="routable" value="true">
+                  <label class="form-check-label" for="changeRoutableTrue">true</label>
+                </div>
+              </div>
+              <div class="col">
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="changeRoutableFalse" name="routable" value="false">
+                  <label class="form-check-label" for="changeRoutableFalse">false</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col">
+                Enable debug output (on stdout / logread)
+              </div>
+              <div class="col">
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="changeDebugTrue" name="debug" value="true">
+                  <label class="form-check-label" for="changeDebugTrue">true</label>
+                </div>
+              </div>
+              <div class="col">
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="changeDebugFalse" name="debug" value="false">
+                  <label class="form-check-label" for="changeDebugFalse">false</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col">
+                Make changes permanent (write to disk)
+              </div>
+              <div class="col">
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="changePermTrue" name="perm" value="true">
+                  <label class="form-check-label" for="changePermTrue">true</label>
+                </div>
+              </div>
+              <div class="col">
+                <div class="mb-3">
+                  <input class="form-check-input" type="radio" id="changePermFalse" name="perm" value="false">
+                  <label class="form-check-label" for="changePermFalse">false</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col">
+                <div class="mb-3">
+                  <input class="btn btn-primary" type="submit" value="Update configuration">
+                </div>
+              </div>
+            </div>
+
+          </form>
+        </div>
+
+      </div>
+
+  </body>
+</html>

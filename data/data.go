@@ -42,7 +42,6 @@ type Entry struct {
 	FirstName   string
 	LastName    string
 	Callsign    string
-	IPAddress   string
 	PhoneNumber string
 
 	// Optional data
@@ -54,6 +53,14 @@ type Entry struct {
 
 	// Metadata
 	OLSR *OLSR // if present, the participant seems to be active
+}
+
+func (e *Entry) DirectCallAddress() string {
+	return fmt.Sprintf("%s@%s", e.PhoneNumber, e.FQDNFromPhone())
+}
+
+func (e *Entry) FQDNFromPhone() string {
+	return fmt.Sprintf("%s.%s", e.PhoneNumber, AREDNDomain)
 }
 
 // Target

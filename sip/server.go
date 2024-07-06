@@ -122,14 +122,9 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 			continue
 		}
 
-		host := fmt.Sprintf("%s.local.mesh", entry.PhoneNumber)
-		parts := strings.Split(entry.IPAddress, data.SIPSeparator)
-		if len(parts) > 1 {
-			if s.Config.Resolve && entry.OLSR != nil {
-				host = entry.OLSR.IP
-			} else {
-				host = parts[1]
-			}
+		host := entry.FQDNFromPhone()
+		if s.Config.Resolve && entry.OLSR != nil {
+			host = entry.OLSR.IP
 		}
 
 		// We found an entry in the phonebook to redirect to.

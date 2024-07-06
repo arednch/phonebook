@@ -1,7 +1,6 @@
 package data
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -15,7 +14,6 @@ func NewEntryFromOLSR(o *OLSR) *Entry {
 	pn := strings.Split(o.Hostname, ".")[0]
 	return &Entry{
 		PhoneNumber: pn,
-		IPAddress:   fmt.Sprintf("%s@%s.%s", pn, pn, AREDNDomain),
 		OLSR:        o,
 	}
 }

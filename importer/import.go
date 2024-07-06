@@ -84,7 +84,6 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 			FirstName:   strings.TrimSpace(r[0]),
 			LastName:    strings.TrimSpace(r[1]),
 			Callsign:    strings.TrimSpace(r[2]),
-			IPAddress:   strings.TrimSpace(r[3]),
 			PhoneNumber: strings.TrimSpace(r[4]),
 		}
 		if len(r) > 9 {

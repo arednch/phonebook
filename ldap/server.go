@@ -105,7 +105,7 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 				if s.Config.Resolve && entry.OLSR != nil {
 					telAttrs[entry.OLSR.IP] = true
 				} else {
-					telAttrs[entry.IPAddress] = true
+					telAttrs[entry.DirectCallAddress()] = true
 				}
 			case "pbx":
 				telAttrs[entry.PhoneNumber] = true
@@ -114,7 +114,7 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 					telAttrs[entry.OLSR.IP] = true
 					telAttrs[entry.PhoneNumber] = true
 				} else {
-					telAttrs[entry.IPAddress] = true
+					telAttrs[entry.DirectCallAddress()] = true
 					telAttrs[entry.PhoneNumber] = true
 				}
 			}
@@ -133,7 +133,7 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 			{Name: "callsign", Values: []string{entry.Callsign}},
 
 			{Name: "telephoneNumber", Values: []string{entry.PhoneNumber}},
-			{Name: "telephoneHostname", Values: []string{entry.IPAddress}},
+			{Name: "telephoneHostname", Values: []string{entry.DirectCallAddress()}},
 		}
 		if entry.OLSR != nil {
 			attrs = append(attrs, &ldapserver.EntryAttribute{Name: "telephoneIP", Values: []string{entry.OLSR.IP}})

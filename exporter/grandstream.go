@@ -74,7 +74,7 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 			} else {
 				tel = []*GrandstreamPhone{{
 					AccountIndex: GrandstreamDefaultIPCallAccountIdx,
-					PhoneNumber:  entry.IPAddress,
+					PhoneNumber:  entry.DirectCallAddress(),
 				}}
 			}
 		case "pbx":
@@ -97,7 +97,7 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 				tel = []*GrandstreamPhone{
 					{
 						AccountIndex: GrandstreamDefaultIPCallAccountIdx,
-						PhoneNumber:  entry.IPAddress,
+						PhoneNumber:  entry.DirectCallAddress(),
 					}, {
 						AccountIndex: GrandstreamDefaultPBXAccountIdx,
 						PhoneNumber:  entry.PhoneNumber,

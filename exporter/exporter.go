@@ -41,7 +41,7 @@ func TelefoneForEntry(entry *data.Entry, resolve bool, format Format) []string {
 		if resolve && entry.OLSR != nil {
 			return []string{entry.OLSR.IP}
 		} else {
-			return []string{entry.IPAddress}
+			return []string{entry.DirectCallAddress()}
 		}
 	case "pbx":
 		return []string{entry.PhoneNumber}
@@ -53,7 +53,7 @@ func TelefoneForEntry(entry *data.Entry, resolve bool, format Format) []string {
 			}
 		} else {
 			return []string{
-				entry.IPAddress,
+				entry.DirectCallAddress(),
 				entry.PhoneNumber,
 			}
 		}

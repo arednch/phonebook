@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>Phonebook: Reload</title>
+		<title>Phonebook: Show Config</title>
     <link href="/static/bootstrap.min.css" rel="stylesheet">
 	</head>
 
@@ -26,21 +26,41 @@
 
       {{ if .Success }}
         <div class="alert alert-success">
-          <div class="row">
-            <div class="col">
-              Phonebook reloaded locally from {{ .Source }}
-            </div>
-          </div>
-        </div>
       {{ else }}
         <div class="alert alert-danger">
           <div class="row">
             <div class="col">
-              Unable to reload phonebook from {{ .Source }}
+              Unable to show config
             </div>
+          </div>
+      {{ end }}
+
+      {{ range .Messages }}
+        <div class="row">
+          <div class="col">
+            {{ . }}
           </div>
         </div>
       {{ end }}
+
+      {{ if .Content }}
+        <div class="row">
+          <div class="col">
+            <pre><code>{{ .Content }}</code></pre>
+          </div>
+        </div>
+      {{ end }}
+    </div>
+
+    {{ if .Diff }}
+      <div class="row">
+        <div class="col">
+          Legend:<br>
+           - items in runtime config but not on disk<br>
+          + items in disk config but not runtime<br>
+        </div>
+      </div>
+    {{ end }}
 
   </body>
 </html>

@@ -13,3 +13,11 @@ type WebReload struct {
 	Source  string
 	Success bool
 }
+
+type WebShowConfig struct {
+	Version  string
+	Messages []string
+	Content  string
+	Diff     bool
+	Success  bool
+}

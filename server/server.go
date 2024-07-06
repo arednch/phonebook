@@ -73,7 +73,6 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)
-		return
 	}
 }
 
@@ -89,13 +88,22 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
+	data := data.WebShowConfig{
+		Version: s.Version,
+		Success: true,
+	}
+
 	t := r.FormValue("type")
 	t = strings.ToLower(strings.TrimSpace(t))
 	if t == "" {
+		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/showconfig: 'type' not specified: %+v\n", r)
 		}
-		http.Error(w, "'type' must be specified: [disk,runtime,diff]", http.StatusBadRequest)
+		data.Messages = append(data.Messages, "'type' must be specified: [disk,runtime,diff]")
+		if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -103,56 +111,78 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case t == "d" || t == "disk" || t == "diff":
 		if s.ConfigPath == "" {
-			http.Error(w, "phonebook was not started with a config path set ('-conf' flag) so config file can't be loaded", http.StatusInternalServerError)
+			data.Success = false
+			data.Messages = append(data.Messages, "phonebook was not started with a config path set ('-conf' flag) so config file can't be loaded")
+			if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
 		var err error
 		if cfg, err = configuration.ReadFromJSON(s.ConfigPath); err != nil {
+			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/showconfig: unable to read config: %s\n", err)
 			}
-			http.Error(w, "unable to read config", http.StatusInternalServerError)
+			data.Messages = append(data.Messages, "unable to read config")
+			if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
 	case t == "r" || t == "runtime":
 		cfg = s.Config
 	default:
+		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/showconfig: 'type' %q not as expected: %+v\n", t, r)
 		}
-		http.Error(w, "'type' must be specified: [disk,runtime]", http.StatusBadRequest)
+		data.Messages = append(data.Messages, "'type' must be specified: [disk,runtime]")
+		if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	if t != "diff" {
 		config, err := configuration.ConvertToJSON(*cfg, true)
 		if err != nil {
+			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/showconfig: unable to convert config: %s\n", err)
 			}
-			http.Error(w, "unable to convert config", http.StatusInternalServerError)
+			data.Messages = append(data.Messages, "unable to convert config")
+			if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(config)
+		data.Content = string(config)
+		if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	diffs, err := s.Config.Diff(cfg)
 	if err != nil {
+		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/showconfig: unable to diff configs: %s\n", err)
 		}
-		http.Error(w, "unable to diff config", http.StatusInternalServerError)
+		data.Messages = append(data.Messages, "unable to diff config")
+		if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Legend:\n"))
-	w.Write([]byte("- items in runtime config but not on disk\n"))
-	w.Write([]byte("+ items in disk config but not runtime\n\n"))
-	w.Write([]byte(diffs))
+
+	data.Diff = true
+	data.Content = diffs
+	if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
+		http.Error(w, "unable to write response", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -386,16 +416,15 @@ func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
 		Success: true,
 	}
 	if err := s.ReloadFn(s.Config); err != nil {
+		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/reload: unable to reload phonebook: %s\n", err)
 		}
-		data.Success = false
 	} else if s.Config.Debug {
 		fmt.Printf("/reload: phonebook reloaded locally from %q\n", s.Config.Source)
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "reload.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)
-		return
 	}
 }
 

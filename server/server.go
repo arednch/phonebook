@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ import (
 	"github.com/arednch/phonebook/importer"
 )
 
-type ReloadFunc func(cfg *configuration.Config) error
+type ReloadFunc func(cfg *configuration.Config) (string, error)
 
 func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template) *Server {
 	return &Server{
@@ -75,6 +76,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	data := data.WebIndex{
 		Version: s.Version.Version,
 		Updated: s.Records.Updated.Format(time.RFC3339),
+		Sources: strings.Join(s.Config.Sources, "\n"),
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -279,20 +281,47 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for supported fields to update and verify.
-	src := r.FormValue("source")
-	src = strings.TrimSpace(src)
-	if src != "" {
-		if _, err := importer.ReadPhonebook(src); err != nil {
+	rawSrc := r.FormValue("sources")
+	var srcs []string
+	for _, src := range strings.Split(strings.TrimSpace(rawSrc), "\n") {
+		src = strings.Trim(src, " \n\r")
+		switch {
+		case strings.HasPrefix(src, "http"):
+			if _, err := url.ParseRequestURI(src); err != nil {
+				data.Success = false
+				if s.Config.Debug {
+					fmt.Printf("/updateconfig: specified source are not all readable: %s\n", err)
+				}
+				data.Messages = append(data.Messages, "specified sources cannot all be read, make sure they exist and are either a valid, absolute file path or an http/https URL")
+				if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+					http.Error(w, "unable to write response", http.StatusInternalServerError)
+				}
+				return
+			}
+		case strings.HasPrefix(src, "/"):
+			if _, err := importer.ReadPhonebook(src); err != nil {
+				data.Success = false
+				if s.Config.Debug {
+					fmt.Printf("/updateconfig: specified source are not all readable: %s\n", err)
+				}
+				data.Messages = append(data.Messages, "specified sources cannot all be read, make sure they exist and are either a valid, absolute file path or an http/https URL")
+				if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+					http.Error(w, "unable to write response", http.StatusInternalServerError)
+				}
+				return
+			}
+		default:
 			data.Success = false
 			if s.Config.Debug {
-				fmt.Printf("/updateconfig: specified source is not readable: %s\n", err)
+				fmt.Printf("/updateconfig: specified source formats are not all readable: %s\n", src)
 			}
-			data.Messages = append(data.Messages, "specified source cannot be read, make sure it exists and is either a valid, absolute file path or http/https URL")
+			data.Messages = append(data.Messages, "specified sources formats cannot all be read, make sure they exist and are either a valid, absolute file path or an http/https URL")
 			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 				http.Error(w, "unable to write response", http.StatusInternalServerError)
 			}
 			return
 		}
+		srcs = append(srcs, src)
 	}
 
 	var reload int
@@ -359,15 +388,15 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	webpwd = strings.TrimSpace(webpwd)
 
 	// Update supported fields (assume fields are validated by now).
-	if src != "" {
+	if len(srcs) > 0 {
 		changed = true
-		s.Config.Source = src
+		s.Config.Sources = srcs
 		if cfg != nil {
-			cfg.Source = src
+			cfg.Sources = srcs
 		}
-		data.Messages = append(data.Messages, fmt.Sprintf("- \"source\" now set to %q", src))
+		data.Messages = append(data.Messages, fmt.Sprintf("- \"source\" now set to %s", srcs))
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"source\" now set to %q\n", src)
+			fmt.Printf("/updateconfig: \"source\" now set to %s\n", srcs)
 		}
 	}
 
@@ -496,16 +525,19 @@ func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
 	data := data.WebReload{
 		Version: s.Version.Version,
 		Updated: s.Records.Updated.Format(time.RFC3339),
-		Source:  s.Config.Source,
 		Success: true,
 	}
-	if err := s.ReloadFn(s.Config); err != nil {
+	if src, err := s.ReloadFn(s.Config); err != nil {
 		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/reload: unable to reload phonebook: %s\n", err)
 		}
-	} else if s.Config.Debug {
-		fmt.Printf("/reload: phonebook reloaded locally from %q\n", s.Config.Source)
+	} else {
+		data.Source = src
+		data.Updated = s.Records.Updated.Format(time.RFC3339)
+		if s.Config.Debug {
+			fmt.Printf("/reload: phonebook reloaded from %q\n", src)
+		}
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "reload.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)

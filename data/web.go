@@ -24,6 +24,8 @@ type RecordStats struct {
 type WebIndex struct {
 	Version string
 	Updated string
+
+	Sources string
 }
 
 type WebReload struct {

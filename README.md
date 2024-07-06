@@ -10,7 +10,7 @@ For release notes, see the [release page](https://github.com/arednch/packages/re
 Generally applicable:
 
 - `conf`: Config file to read settings from instead of parsing flags. Default: ""
-- `source`: Path or URL to fetch the phonebook CSV from. Default: ""
+- `sources`: Comma separated list of paths and/or URLs to fetch the phonebook CSV from. Default: ""
 - `olsr`: Path to the OLSR hosts file. Default: `/tmp/run/hosts_olsr`
 - `sysinfo`: URL from which to fetch AREDN sysinfo. Usually: `http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1`
 - `server`: Phonebook acts as a server when set to true. Default: false
@@ -40,7 +40,7 @@ Only relevant when running in **non-server / ad-hoc mode**:
 
 Only relevant when running in **server mode**:
 
-- `port`: Port to listen on (when running as a server). Default: `8080`
+- `port`: Port to listen on (when running as a server). Default: `8081`
 - `reload`: Duration after which to try to reload the phonebook source. Default: `1h`
 - `web_user`: Username to protect many of the web endpoints with (BasicAuth). Default: None
 - `web_pwd`: Password to protect many of the web endpoints with (BasicAuth). Default: None
@@ -70,7 +70,7 @@ go run phonebook.go -source='AREDN_Phonebook.csv' -targets='yealink' -formats='d
 Read the CSV from a URL and write the XML files in the `/tmp` folder for Yealink and Cisco phones:
 
 ```
-go run phonebook.go -source='http://aredn-node.local.mesh:8080/phonebook.csv' -targets='yealink,cisco' -formats='direct,pbx' -path=/tmp/
+go run phonebook.go -source='http://aredn-node.local.mesh:8081/phonebook.csv' -targets='yealink,cisco' -formats='direct,pbx' -path=/tmp/
 ```
 
 ## OpenWRT / AREDN
@@ -96,7 +96,7 @@ Description=Phonebook for AREDN.
 [Service]
 User=root
 WorkingDirectory=/tmp/
-ExecStart=/usr/bin/phonebook --server=true --port=8080 --source="<insert CSV source>" --olsr="/tmp/run/hosts_olsr" --sysinfo="http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1"
+ExecStart=/usr/bin/phonebook --server=true --port=8081 --source="<insert CSV source>" --olsr="/tmp/run/hosts_olsr" --sysinfo="http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1"
 Restart=always
 
 [Install]
@@ -139,7 +139,10 @@ A typical file would look like this:
 
 ```
 {
-	"source": "/www/arednstack/phonebook.csv",
+	"sources": [
+		"http://aredn-node-1.local.mesh:8081/phonebook.csv",
+		"http://aredn-node-2.local.mesh:8081/phonebook.csv"
+	],
 	"olsr_file": "/tmp/run/hosts_olsr",
 	"sysinfo_url": "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1",
 	"ldap_server": true,
@@ -183,6 +186,38 @@ Note: We assume the standard AREDN setup and thus use "localnode.local.mesh" as 
 host and "8081" as the port. Adjust it as needed if you are using it in another configuration.
 
 Note: Each endpoint has a `BasicAuth protection` definition. This is a simple statement whether that endpoint needs BasicAuth authentication when `web_user` and `web_pwd` is set (see [flags](#flags) for more details) as well.
+
+#### / and /index.html
+
+This is the entry page and should provide access to the other endpoints in an understandable way.
+
+Example: http://localnode.local.mesh:8081/index.html
+
+BasicAuth protection: No.
+
+Required parameters:
+
+- n/a
+
+Optional parameters:
+
+- n/a
+
+#### /info
+
+This endpoint is meant for informational and debugging purposes as it exposes some information about the node and phonebook in a machine readable way.
+
+Example: http://localnode.local.mesh:8081/info
+
+BasicAuth protection: No.
+
+Required parameters:
+
+- n/a
+
+Optional parameters:
+
+- n/a
 
 #### /phonebook
 
@@ -260,7 +295,7 @@ Optional parameters:
 
 - `perm`: When set to `true`, instructs the phonebook server to write the config to disk as well. If not set, changes are only made to the running service. When the service restarts (e.g. when the Node reboots), the config is read from disk again.
 
-- `source`: Defines the source URL to load the upstream phonebook from (CSV). See [flags](#flags) for more details.
+- `sources`: Defines the source paths or URLs to load the upstream phonebook from (CSV). See [flags](#flags) for more details.
 
 - `reload`: Defines the amount of time to wait between reloading the phonebook data from the specified source. See [flags](#flags) for more details.
 

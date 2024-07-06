@@ -106,12 +106,12 @@
               <form action="/showconfig">
 
                 <div class="mb-3">
-                  <input class="form-check-input" type="radio" id="configTypeDisk" name="type" value="disk">
-                  <label class="form-check-label" for="configTypeDisk">Disk</label>
+                  <input class="form-check-input" type="radio" id="configTypeRuntime" name="type" value="runtime" checked>
+                  <label class="form-check-label" for="configTypeRuntime">Runtime</label>
                 </div>
                 <div class="mb-3">
-                  <input class="form-check-input" type="radio" id="configTypeRuntime" name="type" value="runtime">
-                  <label class="form-check-label" for="configTypeRuntime">Runtime</label>
+                  <input class="form-check-input" type="radio" id="configTypeDisk" name="type" value="disk">
+                  <label class="form-check-label" for="configTypeDisk">Disk</label>
                 </div>
                 <div class="mb-3">
                   <input class="form-check-input" type="radio" id="configTypeDiff" name="type" value="diff">
@@ -150,12 +150,12 @@
             
             <div class="row">
               <div class="col">
-                Source to load phonebook from (must return a CSV file)
+                Sources (one per line) to load phonebook from
               </div>
               <div class="col">
                 <div class="form-floating mb-3">
-                  <input class="form-control" type="text" id="changeSource" name="source" value="" placeholder="Source to load phonebook from (must return a CSV file)">
-                  <label class="form-label" for="changeSource">Source to load phonebook from (must return a CSV file)</label>
+                  <textarea class="form-control" id="changeSources" name="sources" value="" placeholder="Sources (one per line) to load phonebook from" style="height: 150px">{{ .Sources }}</textarea>
+                  <label class="form-label" for="changeSources">Sources (one per line) to load phonebook from</label>
                 </div>
               </div>
             </div>

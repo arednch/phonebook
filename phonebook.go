@@ -33,7 +33,7 @@ import (
 var (
 	// Generally applicable flags.
 	conf            = flag.String("conf", "", "OpenWRT UCI tree path to read config from instead of parsing flags.")
-	source          = flag.String("source", "", "Path or URL to fetch the phonebook CSV from.")
+	sources         = flag.String("sources", "", "Comma separated paths or URLs to fetch the phonebook CSV from.")
 	olsrFile        = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
 	sysInfoURL      = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
 	daemonize       = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
@@ -54,7 +54,7 @@ var (
 	activePfx      = flag.String("active_pfx", "*", "Prefix to add when -indicate_active is set.")
 
 	// Only relevant when running in server mode.
-	port     = flag.Int("port", 8080, "Port to listen on (when running as a server).")
+	port     = flag.Int("port", 8081, "Port to listen on (when running as a server).")
 	reload   = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
 	webUser  = flag.String("web_user", "", "Username to protect many of the web endpoints with (BasicAuth). Default: None")
 	webPwd   = flag.String("web_pwd", "", "Password to protect many of the web endpoints with (BasicAuth). Default: None")
@@ -144,13 +144,22 @@ func refreshSysinfo(cfg *configuration.Config) error {
 	return nil
 }
 
-func refreshRecords(cfg *configuration.Config) error {
-	if cfg.Debug {
-		fmt.Printf("Reading phonebook from %q\n", cfg.Source)
+func refreshRecords(cfg *configuration.Config) (string, error) {
+	var updatedFrom string
+	var err error
+	var rec []*data.Entry
+	for _, src := range cfg.Sources {
+		if cfg.Debug {
+			fmt.Printf("Reading phonebook from %q\n", src)
+		}
+		rec, err = importer.ReadPhonebook(src)
+		if err == nil {
+			updatedFrom = src
+			break
+		}
 	}
-	rec, err := importer.ReadPhonebook(cfg.Source)
-	if err != nil {
-		return fmt.Errorf("error reading phonebook: %s", err)
+	if rec == nil {
+		return "", fmt.Errorf("error reading phonebook: %s", err)
 	}
 
 	runtimeInfo.Mu.Lock()
@@ -159,22 +168,22 @@ func refreshRecords(cfg *configuration.Config) error {
 	switch {
 	case cfg.OLSRFile == "" && runtimeInfo.SysInfo == nil:
 		fmt.Println("not reading network information: no OLSR file nor sysinfo available")
-		return nil
+		return updatedFrom, nil
 
 	case runtimeInfo.SysInfo != nil:
 		hostData, err = olsr.ReadFromSysInfo(runtimeInfo.SysInfo)
 		if err != nil {
-			return fmt.Errorf("error reading OLSR data from sysinfo: %s", err)
+			return updatedFrom, fmt.Errorf("error reading OLSR data from sysinfo: %s", err)
 		}
 
 	case cfg.OLSRFile != "":
 		if _, err := os.Stat(cfg.OLSRFile); err != nil {
 			fmt.Printf("not reading network information: OLSR file %q does not exist\n", cfg.OLSRFile)
-			return nil
+			return updatedFrom, nil
 		}
 		hostData, err = olsr.ReadFromFile(cfg.OLSRFile)
 		if err != nil {
-			return fmt.Errorf("error reading OLSR data from file %q: %s", cfg.OLSRFile, err)
+			return updatedFrom, fmt.Errorf("error reading OLSR data from file %q: %s", cfg.OLSRFile, err)
 		}
 	}
 
@@ -185,7 +194,7 @@ func refreshRecords(cfg *configuration.Config) error {
 	records.Entries = rec
 	records.Updated = time.Now()
 
-	return nil
+	return updatedFrom, nil
 }
 
 func exportOnce(cfg *configuration.Config) error {
@@ -297,8 +306,8 @@ func getLocalIdentities() (map[string]bool, error) {
 }
 
 func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, ver *data.Version) error {
-	if cfg.Source == "" {
-		return errors.New("source needs to be set")
+	if len(cfg.Sources) == 0 {
+		return errors.New("at least one source needs to be set")
 	}
 
 	if cfg.LDAPServer {
@@ -361,8 +370,8 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 
 	go func() {
 		for {
-			if err := refreshRecords(cfg); err != nil {
-				fmt.Printf("error refreshing data from upstream: %s\n", err)
+			if _, err := refreshRecords(cfg); err != nil {
+				fmt.Printf("error refreshing phone records: %s\n", err)
 			}
 			time.Sleep(cfg.Reload)
 		}
@@ -406,7 +415,7 @@ func runLocal(cfg *configuration.Config) error {
 	if err := refreshSysinfo(cfg); err != nil {
 		return err
 	}
-	if err := refreshRecords(cfg); err != nil {
+	if _, err := refreshRecords(cfg); err != nil {
 		return err
 	}
 	if err := exportOnce(cfg); err != nil {
@@ -448,7 +457,7 @@ func main() {
 		}
 	} else {
 		cfg = &configuration.Config{
-			Source:                      *source,
+			Sources:                     strings.Split(*sources, ","),
 			OLSRFile:                    *olsrFile,
 			SysInfoURL:                  *sysInfoURL,
 			Server:                      *daemonize,
@@ -480,8 +489,8 @@ func main() {
 		cfg.Server = *daemonize
 	}
 
-	if cfg.Source == "" {
-		fmt.Println("source needs to be set")
+	if len(cfg.Sources) == 0 {
+		fmt.Println("at least one source needs to be set")
 		os.Exit(1)
 	}
 

@@ -31,6 +31,11 @@ func (e ByCallsign) Len() int           { return len(e) }
 func (e ByCallsign) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 func (e ByCallsign) Less(i, j int) bool { return e[i].Callsign < e[j].Callsign }
 
+type Version struct {
+	Version   string `json:"version"`
+	CommitSHA string `json:"commit_sha"`
+}
+
 // Source
 
 type Records struct {

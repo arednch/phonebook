@@ -19,7 +19,7 @@ import (
 
 type ReloadFunc func(cfg *configuration.Config) error
 
-func NewServer(cfg *configuration.Config, cfgPath, version string, records *data.Records, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, tmpls *template.Template) *Server {
+func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, tmpls *template.Template) *Server {
 	return &Server{
 		Version:    version,
 		Config:     cfg,
@@ -32,7 +32,7 @@ func NewServer(cfg *configuration.Config, cfgPath, version string, records *data
 }
 
 type Server struct {
-	Version    string
+	Version    *data.Version
 	Config     *configuration.Config
 	ConfigPath string // optional when using config file
 
@@ -69,7 +69,7 @@ func (s *Server) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	data := data.WebIndex{
-		Version: s.Version,
+		Version: s.Version.Version,
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -78,7 +78,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 	data, err := json.Marshal(&data.WebInfo{
-		Version: s.Version,
+		Version: *s.Version,
 	})
 	if err != nil {
 		http.Error(w, "unable to marshal info", http.StatusInternalServerError)
@@ -89,7 +89,7 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	data := data.WebShowConfig{
-		Version: s.Version,
+		Version: s.Version.Version,
 		Success: true,
 	}
 
@@ -187,7 +187,7 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	data := data.WebUpdateConfig{
-		Version: s.Version,
+		Version: s.Version.Version,
 		Success: true,
 	}
 
@@ -460,7 +460,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
 	data := data.WebReload{
-		Version: s.Version,
+		Version: s.Version.Version,
 		Source:  s.Config.Source,
 		Success: true,
 	}

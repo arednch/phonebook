@@ -69,7 +69,10 @@ const (
 )
 
 var (
+	// Compile time flags (LDFLAGS)
 	Version   string
+	CommitSHA string
+
 	records   *data.Records
 	exporters map[string]exporter.Exporter
 
@@ -276,7 +279,7 @@ func getLocalIdentities() (map[string]bool, error) {
 	return identities, nil
 }
 
-func runServer(ctx context.Context, cfg *configuration.Config, cfgPath, version string) error {
+func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, ver *data.Version) error {
 	if cfg.Source == "" {
 		return errors.New("source needs to be set")
 	}
@@ -337,7 +340,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath, version 
 	}()
 
 	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
-	srv := server.NewServer(cfg, cfgPath, version, records, exporters, refreshRecords, tmpls)
+	srv := server.NewServer(cfg, cfgPath, ver, records, exporters, refreshRecords, tmpls)
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
 	if cfg.WebUser != "" && cfg.WebPwd != "" {
 		if cfg.Debug {
@@ -461,7 +464,10 @@ func main() {
 		if *debug {
 			fmt.Println("Running phonebook in server mode")
 		}
-		if err := runServer(ctx, cfg, *conf, Version); err != nil {
+		if err := runServer(ctx, cfg, *conf, &data.Version{
+			Version:   Version,
+			CommitSHA: CommitSHA,
+		}); err != nil {
 			fmt.Printf("unable to run server: %s\n", err)
 			os.Exit(1)
 		}

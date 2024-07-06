@@ -1,7 +1,7 @@
 package data
 
 type WebInfo struct {
-	Version string `json:"version"`
+	Version Version
 }
 
 type WebIndex struct {

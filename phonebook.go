@@ -88,6 +88,7 @@ var (
 	}
 
 	//go:embed templates/*
+	//go:embed resources/*
 	webFS embed.FS
 )
 

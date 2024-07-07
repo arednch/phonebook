@@ -32,7 +32,7 @@ import (
 
 var (
 	// Generally applicable flags.
-	conf            = flag.String("conf", "", "OpenWRT UCI tree path to read config from instead of parsing flags.")
+	conf            = flag.String("conf", "", "Path to the JSON config file instead of parsing flags.")
 	sources         = flag.String("sources", "", "Comma separated paths or URLs to fetch the phonebook CSV from.")
 	olsrFile        = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
 	sysInfoURL      = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")

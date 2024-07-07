@@ -115,7 +115,7 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data, err := json.Marshal(info)
+	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		http.Error(w, "unable to marshal info", http.StatusInternalServerError)
 		return

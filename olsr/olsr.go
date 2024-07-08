@@ -73,9 +73,6 @@ func ReadFromFile(path string) (map[string]*data.OLSR, error) {
 			IP:       parts[1],
 			Hostname: parts[2],
 		}
-		if len(parts) > 3 {
-			o.Comment = parts[3]
-		}
 		d[o.Hostname] = o
 	}
 

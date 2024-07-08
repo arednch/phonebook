@@ -39,21 +39,18 @@
 
               <div class="form-floating mb-3">
                 <select class="form-control" type="text" id="format" name="format" value="combined" placeholder="Format (e.g. direct, pbx, combined)">
+                  <option selected>combined</option>
                   <option>direct</option>
                   <option>pbx</option>
-                  <option>combined</option>
                 </select>
                 <label class="form-label" for="format">Format (e.g. direct, pbx, combined)</label>
               </div>
 
               <div class="form-floating mb-3">
                 <select class="form-control" type="text" id="target" name="target" value="generic" placeholder="Target (e.g. generic, yaesu, grandstream, vcard)">
-                  <option>generic</option>
-                  <option>yaesu</option>
-                  <option>cisco</option>
-                  <option>snom</option>
-                  <option>grandstream</option>
-                  <option>vcard</option>
+                  {{ range .Exporters }}
+                    <option {{ if eq . "generic" }}selected{{ end }}>{{ . }}</option>
+                  {{ end }}
                 </select>
                 <label class="form-label" for="target">Target (e.g. generic, yaesu, grandstream, vcard)</label>
               </div>

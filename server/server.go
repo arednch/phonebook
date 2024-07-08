@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -73,10 +74,16 @@ func (s *Server) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
+	var exp []string
+	for k := range s.Exporters {
+		exp = append(exp, k)
+	}
+	sort.Strings(exp)
 	data := data.WebIndex{
-		Version: s.Version.Version,
-		Updated: s.Records.Updated.Format(time.RFC3339),
-		Sources: strings.Join(s.Config.Sources, "\n"),
+		Version:   s.Version.Version,
+		Updated:   s.Records.Updated.Format(time.RFC3339),
+		Sources:   strings.Join(s.Config.Sources, "\n"),
+		Exporters: exp,
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)

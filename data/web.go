@@ -25,7 +25,8 @@ type WebIndex struct {
 	Version string
 	Updated string
 
-	Sources string
+	Sources   string
+	Exporters []string
 }
 
 type WebReload struct {

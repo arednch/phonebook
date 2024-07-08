@@ -376,21 +376,21 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 		}
 	}()
 
+	resFS, err := fs.Sub(webFS, "resources")
+	if err != nil {
+		return err
+	}
 	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
 	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, refreshRecords, sipSrv.RegisterCache, tmpls)
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
+	http.HandleFunc("/", srv.Index)
+	http.HandleFunc("/index.html", srv.Index)
+	http.HandleFunc("/info", srv.Info)
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
 	if cfg.WebUser != "" && cfg.WebPwd != "" {
 		if cfg.Debug {
 			fmt.Println("protecting most web endpoints with configured basicAuth user/pwd")
 		}
-		resFS, err := fs.Sub(webFS, "resources")
-		if err != nil {
-			return err
-		}
-		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
-		http.HandleFunc("/", srv.Index)
-		http.HandleFunc("/index.html", srv.Index)
-		http.HandleFunc("/info", srv.Info)
 		http.HandleFunc("/reload", srv.BasicAuth(srv.ReloadPhonebook))
 		http.HandleFunc("/showconfig", srv.BasicAuth(srv.ShowConfig))
 		http.HandleFunc("/updateconfig", srv.BasicAuth(srv.UpdateConfig))

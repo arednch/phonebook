@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -43,6 +42,7 @@ var (
 	allowRtCfgChg   = flag.Bool("allow_runtime_config_changes", false, "Allows runtime config changes via web server when set to true.")
 	allowPermCfgChg = flag.Bool("allow_permanent_config_changes", false, "Allows permanent config changes via web server when set to true.")
 	includeRoutable = flag.Bool("include_routable", false, "Also include routable phone numbers not in the phonebook.")
+	countryPfx      = flag.String("country_prefix", "", "Three digit country prefix for phone numbers.")
 
 	// Only relevant when running in non-server / ad-hoc mode.
 	path           = flag.String("path", "", "Folder to write the phonebooks to locally.")
@@ -54,19 +54,21 @@ var (
 	activePfx      = flag.String("active_pfx", "*", "Prefix to add when -indicate_active is set.")
 
 	// Only relevant when running in server mode.
-	port     = flag.Int("port", 8081, "Port to listen on (when running as a server).")
-	reload   = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
-	webUser  = flag.String("web_user", "", "Username to protect many of the web endpoints with (BasicAuth). Default: None")
-	webPwd   = flag.String("web_pwd", "", "Password to protect many of the web endpoints with (BasicAuth). Default: None")
-	ldapPort = flag.Int("ldap_port", 3890, "Port to listen on for the LDAP server (when running as a server AND LDAP server is on as well).")
-	ldapUser = flag.String("ldap_user", "aredn", "Username to provide to connect to the LDAP server.")
-	ldapPwd  = flag.String("ldap_pwd", "aredn", "Password to provide to connect to the LDAP server.")
-	sipPort  = flag.Int("sip_port", 5060, "Port to listen on for SIP traffic (when running as a server AND SIP server is on as well).")
+	port       = flag.Int("port", 8081, "Port to listen on (when running as a server).")
+	reload     = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
+	webUser    = flag.String("web_user", "", "Username to protect many of the web endpoints with (BasicAuth). Default: None")
+	webPwd     = flag.String("web_pwd", "", "Password to protect many of the web endpoints with (BasicAuth). Default: None")
+	ldapPort   = flag.Int("ldap_port", 3890, "Port to listen on for the LDAP server (when running as a server AND LDAP server is on as well).")
+	ldapUser   = flag.String("ldap_user", "aredn", "Username to provide to connect to the LDAP server.")
+	ldapPwd    = flag.String("ldap_pwd", "aredn", "Password to provide to connect to the LDAP server.")
+	sipPort    = flag.Int("sip_port", 5060, "Port to listen on for SIP traffic (when running as a server AND SIP server is on as well).")
+	updateURLs = flag.String("update_urls", "", "Comma separated list of URLs to pull optional information from. Used for update notifications and such.")
 )
 
 const (
 	defaultExtension = ".xml"
 	sysInfoReload    = 5 * time.Minute
+	updateInfoReload = 24 * time.Hour
 )
 
 var (
@@ -76,6 +78,7 @@ var (
 
 	runtimeInfo *data.RuntimeInfo
 	records     *data.Records
+	updates     *data.Updates
 	exporters   map[string]exporter.Exporter
 
 	extensions = map[string]string{
@@ -140,6 +143,18 @@ func refreshSysinfo(cfg *configuration.Config) error {
 	defer runtimeInfo.Mu.Unlock()
 	runtimeInfo.SysInfo = si
 	runtimeInfo.Updated = time.Now()
+	return nil
+}
+
+func refreshUpdates(cfg *configuration.Config) error {
+	u, _ := importer.ReadUpdatesFromURL(cfg.UpdateURLs)
+	if u == nil {
+		return nil // no update available
+	}
+	updates.Mu.Lock()
+	defer updates.Mu.Unlock()
+	updates.Updates = u
+	updates.Updated = time.Now()
 	return nil
 }
 
@@ -305,10 +320,6 @@ func getLocalIdentities() (map[string]bool, error) {
 }
 
 func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, ver *data.Version) error {
-	if len(cfg.Sources) == 0 {
-		return errors.New("at least one source needs to be set")
-	}
-
 	if cfg.LDAPServer {
 		ldapSrv := &ldap.Server{
 			Config:  cfg,
@@ -376,12 +387,26 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 		}
 	}()
 
+	updates = &data.Updates{
+		Mu: &sync.RWMutex{},
+	}
+	if len(cfg.UpdateURLs) > 0 {
+		go func() {
+			for {
+				if err := refreshUpdates(cfg); err != nil {
+					fmt.Printf("error refreshing updates: %s\n", err)
+				}
+				time.Sleep(updateInfoReload)
+			}
+		}()
+	}
+
 	resFS, err := fs.Sub(webFS, "resources")
 	if err != nil {
 		return err
 	}
 	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
-	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, refreshRecords, sipSrv.RegisterCache, tmpls)
+	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecords, sipSrv.RegisterCache, tmpls)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
 	http.HandleFunc("/", srv.Index)
 	http.HandleFunc("/index.html", srv.Index)
@@ -465,6 +490,7 @@ func main() {
 			Debug:                       *debug,
 			AllowRuntimeConfigChanges:   *allowRtCfgChg,
 			AllowPermanentConfigChanges: *allowPermCfgChg,
+			UpdateURLs:                  strings.Split(*updateURLs, ","),
 			Path:                        *path,
 			Formats:                     strings.Split(*formats, ","),
 			Targets:                     strings.Split(*targets, ","),
@@ -473,6 +499,7 @@ func main() {
 			FilterInactive:              *filterInactive,
 			ActivePfx:                   *activePfx,
 			IncludeRoutable:             *includeRoutable,
+			CountryPrefix:               *countryPfx,
 			Port:                        *port,
 			Reload:                      *reload,
 			WebUser:                     *webUser,
@@ -488,22 +515,12 @@ func main() {
 		cfg.Server = *daemonize
 	}
 
-	if len(cfg.Sources) == 0 {
-		fmt.Println("at least one source needs to be set")
+	if err := cfg.IsValid(); err != nil {
+		fmt.Println("config/flag validation failed:", err)
 		os.Exit(1)
 	}
 
 	if cfg.Server {
-		// Validation only relevant for server.
-		if cfg.Reload.Seconds() < configuration.MinimalReloadSeconds {
-			fmt.Printf("reload config/flag too low (<%d): %d\n", configuration.MinimalReloadSeconds, int(cfg.Reload.Seconds()))
-			os.Exit(1)
-		}
-		if cfg.Reload.Seconds() > configuration.MaxReloadSeconds {
-			fmt.Printf("reload config/flag too high (>%d): %d\n", configuration.MaxReloadSeconds, int(cfg.Reload.Seconds()))
-			os.Exit(1)
-		}
-
 		if *debug {
 			fmt.Println("Running phonebook in server mode")
 		}
@@ -518,20 +535,6 @@ func main() {
 		if *debug {
 			fmt.Println("Running phonebook as a one-time export")
 		}
-
-		if cfg.Path == "" {
-			fmt.Println("path needs to be set")
-			os.Exit(1)
-		}
-		if len(cfg.Formats) == 0 {
-			fmt.Println("formats need to be set")
-			os.Exit(1)
-		}
-		if len(cfg.Targets) == 0 {
-			fmt.Println("targets need to be set")
-			os.Exit(1)
-		}
-
 		if err := runLocal(cfg); err != nil {
 			fmt.Printf("unable to run: %s\n", err)
 			os.Exit(1)

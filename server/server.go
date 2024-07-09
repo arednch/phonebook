@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,13 +20,14 @@ import (
 
 type ReloadFunc func(cfg *configuration.Config) (string, error)
 
-func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo, exporters map[string]exporter.Exporter, refreshRecords ReloadFunc, registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template) *Server {
+func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo, exporters map[string]exporter.Exporter, updates *data.Updates, refreshRecords ReloadFunc, registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template) *Server {
 	return &Server{
 		Version:       version,
 		Config:        cfg,
 		ConfigPath:    cfgPath,
 		Records:       records,
 		RuntimeInfo:   runtimeInfo,
+		Updates:       updates,
 		Exporters:     exporters,
 		RegisterCache: registerCache,
 		ReloadFn:      refreshRecords,
@@ -42,6 +42,7 @@ type Server struct {
 
 	RuntimeInfo   *data.RuntimeInfo
 	Records       *data.Records
+	Updates       *data.Updates
 	Exporters     map[string]exporter.Exporter
 	RegisterCache *data.TTLCache[string, *data.SIPClient]
 
@@ -78,12 +79,20 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	for k := range s.Exporters {
 		exp = append(exp, k)
 	}
+
+	s.Records.Mu.RLock()
+	defer s.Records.Mu.RUnlock()
+	s.Updates.Mu.RLock()
+	defer s.Updates.Mu.RUnlock()
+
 	sort.Strings(exp)
 	data := data.WebIndex{
-		Version:   s.Version.Version,
-		Updated:   s.Records.Updated.Format(time.RFC3339),
-		Sources:   strings.Join(s.Config.Sources, "\n"),
-		Exporters: exp,
+		Version:    s.Version.Version,
+		Updated:    s.Records.Updated.Format(time.RFC3339),
+		Updates:    s.Updates.Updates,
+		UpdateURLs: strings.Join(s.Config.UpdateURLs, "\n"),
+		Sources:    strings.Join(s.Config.Sources, "\n"),
+		Exporters:  exp,
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -288,17 +297,35 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for supported fields to update and verify.
+	rawUpdates := r.FormValue("updates")
+	var upds []string
+	for _, u := range strings.Split(strings.TrimSpace(rawUpdates), "\n") {
+		u = strings.Trim(u, " \n\r")
+		if err := configuration.ValidateURL(u); err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/updateconfig: specified update URL is not valid: %s\n", err)
+			}
+			data.Success = false
+			data.Messages = append(data.Messages, "specified update URL is not valid")
+			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
+			return
+		}
+		upds = append(upds, u)
+	}
+
 	rawSrc := r.FormValue("sources")
 	var srcs []string
 	for _, src := range strings.Split(strings.TrimSpace(rawSrc), "\n") {
 		src = strings.Trim(src, " \n\r")
 		switch {
 		case strings.HasPrefix(src, "http"):
-			if _, err := url.ParseRequestURI(src); err != nil {
-				data.Success = false
+			if err := configuration.ValidateURL(src); err != nil {
 				if s.Config.Debug {
 					fmt.Printf("/updateconfig: specified source are not all readable: %s\n", err)
 				}
+				data.Success = false
 				data.Messages = append(data.Messages, "specified sources cannot all be read, make sure they exist and are either a valid, absolute file path or an http/https URL")
 				if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 					http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -307,10 +334,10 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			}
 		case strings.HasPrefix(src, "/"):
 			if _, err := importer.ReadPhonebook(src); err != nil {
-				data.Success = false
 				if s.Config.Debug {
 					fmt.Printf("/updateconfig: specified source are not all readable: %s\n", err)
 				}
+				data.Success = false
 				data.Messages = append(data.Messages, "specified sources cannot all be read, make sure they exist and are either a valid, absolute file path or an http/https URL")
 				if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 					http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -318,10 +345,10 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		default:
-			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: specified source formats are not all readable: %s\n", src)
 			}
+			data.Success = false
 			data.Messages = append(data.Messages, "specified sources formats cannot all be read, make sure they exist and are either a valid, absolute file path or an http/https URL")
 			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 				http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -338,10 +365,10 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		var err error
 		reload, err = strconv.Atoi(rs)
 		if err != nil {
-			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: invalid reload value: %s\n", rs)
 			}
+			data.Success = false
 			data.Messages = append(data.Messages, "invalid reload value")
 			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 				http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -349,11 +376,41 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if reload < configuration.MinimalReloadSeconds || reload > configuration.MaxReloadSeconds {
-			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/updateconfig: reload value too high or low (<%d or >%d): %s\n", configuration.MinimalReloadSeconds, configuration.MaxReloadSeconds, rs)
 			}
+			data.Success = false
 			data.Messages = append(data.Messages, fmt.Sprintf("reload value too high or low (<%d or >%d)", configuration.MinimalReloadSeconds, configuration.MaxReloadSeconds))
+			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
+			return
+		}
+	}
+
+	apfx := r.FormValue("apfx")
+	apfx = strings.ToLower(strings.TrimSpace(apfx))
+	if apfx != "" && len(apfx) > 1 {
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: invalid active prefix value (can only be one character): %s\n", apfx)
+		}
+		data.Success = false
+		data.Messages = append(data.Messages, "invalid country prefix value (can only be one character)")
+		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	cpfx := r.FormValue("cpfx")
+	cpfx = strings.ToLower(strings.TrimSpace(cpfx))
+	if cpfx != "" {
+		if err := configuration.ValidateCountryPrefix(cpfx); err != nil {
+			if s.Config.Debug {
+				fmt.Printf("/updateconfig: invalid country prefix value: %s\n", err)
+			}
+			data.Success = false
+			data.Messages = append(data.Messages, "invalid country prefix value")
 			if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 				http.Error(w, "unable to write response", http.StatusInternalServerError)
 			}
@@ -367,6 +424,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: invalid debug value: %s\n", dbg)
 		}
+		data.Success = false
 		data.Messages = append(data.Messages, "invalid debug value")
 		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 			http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -377,10 +435,10 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	rt := r.FormValue("routable")
 	rt = strings.ToLower(strings.TrimSpace(rt))
 	if rt != "" && rt != "true" && rt != "false" {
-		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/updateconfig: invalid routable value: %s\n", rt)
 		}
+		data.Success = false
 		data.Messages = append(data.Messages, "invalid routable value")
 		if err := s.Tmpls.ExecuteTemplate(w, "updateconfig.html", data); err != nil {
 			http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -401,9 +459,21 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		if cfg != nil {
 			cfg.Sources = srcs
 		}
-		data.Messages = append(data.Messages, fmt.Sprintf("- \"source\" now set to %s", srcs))
+		data.Messages = append(data.Messages, fmt.Sprintf("- sources now set to %s", srcs))
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"source\" now set to %s\n", srcs)
+			fmt.Printf("/updateconfig: sources now set to %s\n", srcs)
+		}
+	}
+
+	if len(upds) > 0 {
+		changed = true
+		s.Config.UpdateURLs = upds
+		if cfg != nil {
+			cfg.UpdateURLs = upds
+		}
+		data.Messages = append(data.Messages, fmt.Sprintf("- update URLs now set to %s", upds))
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: update URLs now set to %s\n", upds)
 		}
 	}
 
@@ -422,6 +492,30 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if apfx != "" {
+		changed = true
+		s.Config.ActivePfx = apfx
+		if cfg != nil {
+			cfg.ActivePfx = apfx
+		}
+		data.Messages = append(data.Messages, fmt.Sprintf("- active prefix set to %q", apfx))
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: active prefix set to %q\n", apfx)
+		}
+	}
+
+	if cpfx != "" {
+		changed = true
+		s.Config.CountryPrefix = cpfx
+		if cfg != nil {
+			cfg.CountryPrefix = cpfx
+		}
+		data.Messages = append(data.Messages, fmt.Sprintf("- country prefix set to %q", cpfx))
+		if s.Config.Debug {
+			fmt.Printf("/updateconfig: country prefix set to %q\n", cpfx)
+		}
+	}
+
 	if dbg != "" {
 		debug := false
 		if dbg == "true" {
@@ -434,9 +528,9 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.Debug = debug
 		}
 
-		data.Messages = append(data.Messages, fmt.Sprintf("- \"debug\" now set to %t", debug))
+		data.Messages = append(data.Messages, fmt.Sprintf("- debug now set to %t", debug))
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"debug\" now set to %t\n", debug)
+			fmt.Printf("/updateconfig: debug now set to %t\n", debug)
 		}
 	}
 
@@ -452,9 +546,9 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.IncludeRoutable = routable
 		}
 
-		data.Messages = append(data.Messages, fmt.Sprintf("- \"include_routable\" now set to %t", routable))
+		data.Messages = append(data.Messages, fmt.Sprintf("- include_routable now set to %t", routable))
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"include_routable\" now set to %t\n", routable)
+			fmt.Printf("/updateconfig: include_routable now set to %t\n", routable)
 		}
 	}
 
@@ -465,9 +559,9 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.WebUser = webuser
 		}
 
-		data.Messages = append(data.Messages, fmt.Sprintf("- \"web_user\" now set to %q", webuser))
+		data.Messages = append(data.Messages, fmt.Sprintf("- web_user now set to %q", webuser))
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"web_user\" now set to %q\n", webuser)
+			fmt.Printf("/updateconfig: web_user now set to %q\n", webuser)
 		}
 	}
 
@@ -478,12 +572,12 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			cfg.WebPwd = webpwd
 		}
 
-		data.Messages = append(data.Messages, "- \"web_pwd\" now set")
+		data.Messages = append(data.Messages, "- web_pwd now set")
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"web_user\" now set to %q\n", webuser)
+			fmt.Printf("/updateconfig: web_user now set to %q\n", webuser)
 		}
 		if s.Config.Debug {
-			fmt.Printf("/updateconfig: \"web_pwd\" now set\n")
+			fmt.Printf("/updateconfig: web_pwd now set\n")
 		}
 	}
 

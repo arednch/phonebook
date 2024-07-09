@@ -125,3 +125,24 @@ func ReadSysInfoFromURL(url string) (*data.SysInfo, error) {
 
 	return &sysinfo, nil
 }
+
+func ReadUpdatesFromURL(urls []string) ([]*data.Update, error) {
+	for _, url := range urls {
+		b, err := ReadFromURL(url)
+		if err != nil {
+			continue
+		}
+
+		var updates data.Updates
+		if err := json.Unmarshal(b, &updates); err != nil {
+			continue
+		}
+
+		for _, u := range updates.Updates {
+			u.Type = strings.TrimSpace(strings.ToLower(u.Type))
+		}
+
+		return updates.Updates, nil
+	}
+	return nil, errors.New("no URLs or none returned any updates")
+}

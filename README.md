@@ -20,6 +20,7 @@ Generally applicable:
 - `allow_runtime_config_changes`: Allows runtime config changes via web server when set to true.
 - `allow_permanent_config_changes`: Allows permanent config changes via web server when set to true.
 - `include_routable`: Adds other routable phone numbers even when not in the phonebook. Default: `false`
+- `country_prefix`: Mandatory three digit country prefix. Default: None.
 
 Only relevant when running in **non-server / ad-hoc mode**:
 
@@ -42,6 +43,7 @@ Only relevant when running in **server mode**:
 
 - `port`: Port to listen on (when running as a server). Default: `8081`
 - `reload`: Duration after which to try to reload the phonebook source. Default: `1h`
+- `update_urls`: Comma separated list of URLs to fetch information from (used to send optional messages to users). Default: None.
 - `web_user`: Username to protect many of the web endpoints with (BasicAuth). Default: None
 - `web_pwd`: Password to protect many of the web endpoints with (BasicAuth). Default: None
 
@@ -308,6 +310,10 @@ Optional parameters:
 - `webuser`: Defines the user required to authenticate via basicAuth for most web endpoints. See [flags](#flags) for more details.
 
 - `webpwd`: Defines the password required to authenticate via basicAuth for most web endpoints. See [flags](#flags) for more details.
+
+- `apfx`: Active prefix (what contacts get prefixed with when they're online). See [flags](#flags) for more details.
+
+- `cpfx`: Three digit country prefix. See [flags](#flags) for more details.
 
 ## Supported Devices
 

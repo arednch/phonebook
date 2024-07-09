@@ -8,6 +8,7 @@ import (
 type RuntimeInfo struct {
 	Mu      *sync.RWMutex
 	Updated time.Time
+
 	SysInfo *SysInfo
 }
 

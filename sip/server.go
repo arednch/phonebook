@@ -122,7 +122,7 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 			continue
 		}
 
-		host := entry.FQDNFromPhone()
+		host := entry.PhoneFQDN()
 		if s.Config.Resolve && entry.OLSR != nil {
 			host = entry.OLSR.IP
 		}

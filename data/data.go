@@ -56,11 +56,11 @@ type Entry struct {
 }
 
 func (e *Entry) DirectCallAddress() string {
-	return fmt.Sprintf("%s@%s", e.PhoneNumber, e.FQDNFromPhone())
+	return e.PhoneNumber + "@" + e.PhoneFQDN()
 }
 
-func (e *Entry) FQDNFromPhone() string {
-	return fmt.Sprintf("%s.%s", e.PhoneNumber, AREDNDomain)
+func (e *Entry) PhoneFQDN() string {
+	return e.PhoneNumber + "." + AREDNDomain
 }
 
 // Target

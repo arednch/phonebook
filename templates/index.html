@@ -140,6 +140,12 @@
           <div class="row">
             <div class="col">
               <form action="/message">
+                
+                <datalist id="messageContacts" name="to" placeholder="Contact / Phone number to send the message to">
+                  {{ range $name, $phone := .Records }}
+                    <option value="{{ $phone }}">{{ $name }}</option>
+                  {{ end }}
+                </datalist>
 
                 <div class="row">
                   <div class="col">
@@ -147,8 +153,8 @@
                   </div>
                   <div class="col">
                     <div class="form-floating mb-3">
-                      <input class="form-control" type="text" id="messageFrom" name="from" value="" placeholder="Phone number to send the message from">
-                      <label class="form-label" for="messageFrom">Phone number to send the message from</label>
+                      <input list="messageContacts" id="messageFrom" name="from" class="form-control" />
+                      <label class="form-label" for="messageFrom">Contact / Phone number to send the message from</label>
                     </div>
                   </div>
                 </div>
@@ -159,11 +165,7 @@
                   </div>
                   <div class="col">
                     <div class="form-floating mb-3">
-                      <select class="form-control" type="text" id="messageTo" name="to" placeholder="Contact / Phone number to send the message to">
-                        {{ range $name, $phone := .Records }}
-                          <option value="{{ $phone }}">{{ $name }}</option>
-                        {{ end }}
-                      </select>
+                      <input list="messageContacts" id="messageTo" name="to" class="form-control" />
                       <label class="form-label" for="messageTo">Contact / Phone number to send the message to</label>
                     </div>
                   </div>

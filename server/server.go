@@ -87,11 +87,10 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	for k := range s.Exporters {
 		exp = append(exp, k)
 	}
+	sort.Strings(exp)
 
 	s.Records.Mu.RLock()
 	defer s.Records.Mu.RUnlock()
-	s.Updates.Mu.RLock()
-	defer s.Updates.Mu.RUnlock()
 
 	recs := make(map[string]string)
 	for _, e := range s.Records.Entries {
@@ -99,10 +98,11 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 		if s.Config.IndicateActive && e.OLSR != nil {
 			pfx = s.Config.ActivePfx
 		}
-		recs[e.PhoneNumber] = e.DisplayName(pfx)
+		recs[e.DisplayName(pfx)] = e.PhoneNumber
 	}
 
-	sort.Strings(exp)
+	s.Updates.Mu.RLock()
+	defer s.Updates.Mu.RUnlock()
 	data := data.WebIndex{
 		Version:    s.Version.Version,
 		Updated:    s.Records.Updated.Format(time.RFC3339),

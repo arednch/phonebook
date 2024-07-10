@@ -160,8 +160,8 @@
                   <div class="col">
                     <div class="form-floating mb-3">
                       <select class="form-control" type="text" id="messageTo" name="to" placeholder="Contact / Phone number to send the message to">
-                        {{ range $key, $value := .Records }}
-                          <option value="{{ $key }}">{{ $value }}</option>
+                        {{ range $name, $phone := .Records }}
+                          <option value="{{ $phone }}">{{ $name }}</option>
                         {{ end }}
                       </select>
                       <label class="form-label" for="messageTo">Contact / Phone number to send the message to</label>

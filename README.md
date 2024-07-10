@@ -21,6 +21,8 @@ Generally applicable:
 - `allow_permanent_config_changes`: Allows permanent config changes via web server when set to true.
 - `include_routable`: Adds other routable phone numbers even when not in the phonebook. Default: `false`
 - `country_prefix`: Mandatory three digit country prefix. Default: None.
+- `active_pfx`: Prefix to add when -indicate_active is set. Default: `*`
+- `indicate_active`: Prefixes active participants in the phonebook with `active_pfx`. Default: `false`
 
 Only relevant when running in **non-server / ad-hoc mode**:
 
@@ -36,7 +38,6 @@ Only relevant when running in **non-server / ad-hoc mode**:
 		- Default: ""
 
 - `resolve`: Resolve hostnames to IPs when set to true using OLSR data. Default: `false`
-- `indicate_active`: Prefixes active participants in the phonebook with `[A]`. Default: `false`
 - `filter_inactive`: Filters inactive participants to not show in the phonebook. Default: `false`
 
 Only relevant when running in **server mode**:

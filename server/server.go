@@ -177,6 +177,9 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.Records.Mu.RLock()
+	defer s.Records.Mu.RUnlock()
+
 	if checkExistenceBeforeSending {
 		if _, ok := s.RegisterCache.Get(from); !ok {
 			if s.Config.Debug {
@@ -205,6 +208,27 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if checkExistenceBeforeSending {
+		found := false
+		for _, e := range s.Records.Entries {
+			if e.PhoneNumber == to {
+				found = true
+				break
+			}
+		}
+		if !found {
+			if s.Config.Debug {
+				fmt.Printf("/message: destination specified not found in phonebook: %s\n", to)
+			}
+			d.Success = false
+			d.Message = "destination specified not found in phonebook"
+			if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
+			return
+		}
+	}
+
 	msg := r.FormValue("msg")
 	msg = strings.ToLower(strings.TrimSpace(msg))
 	if to == "" {
@@ -219,20 +243,29 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d.From = from
-	d.To = to
+	fe := &data.Entry{PhoneNumber: from}
+	te := &data.Entry{PhoneNumber: to}
+	for _, e := range s.Records.Entries {
+		if from == e.PhoneNumber {
+			fe = e
+		}
+		if to == e.PhoneNumber {
+			te = e
+		}
+	}
+
+	d.From = fmt.Sprintf("%s, %s", fe.DisplayName(""), from)
+	d.To = fmt.Sprintf("%s, %s", te.DisplayName(""), to)
 	d.Message = msg
-	te := data.Entry{PhoneNumber: to}
 	t := &data.SIPAddress{
-		DisplayName: to,
+		DisplayName: te.DisplayName(""),
 		URI: &data.SIPURI{
 			User: to,
 			Host: te.PhoneFQDN(),
 		},
 	}
-	fe := data.Entry{PhoneNumber: from}
 	f := &data.SIPAddress{
-		DisplayName: from,
+		DisplayName: te.DisplayName(""),
 		URI: &data.SIPURI{
 			User: from,
 			Host: fe.PhoneFQDN(),

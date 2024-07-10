@@ -18,6 +18,11 @@ import (
 	"github.com/arednch/phonebook/importer"
 )
 
+const (
+	// When true, checks whether the sender exists before sending the message out.
+	checkExistenceBeforeSending = false
+)
+
 type ReloadFunc func(cfg *configuration.Config) (string, error)
 type SendSIPMessage func(*data.SIPRequest) (*data.SIPResponse, error)
 
@@ -172,17 +177,19 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if _, ok := s.RegisterCache.Get(from); !ok {
-	// 	if s.Config.Debug {
-	// 		fmt.Printf("/message: 'from' not in locally registered phones: %s\n", from)
-	// 	}
-	// 	d.Success = false
-	// 	d.Message = "'from' phone number is not locally registered"
-	// 	if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
-	// 		http.Error(w, "unable to write response", http.StatusInternalServerError)
-	// 	}
-	// 	return
-	// }
+	if checkExistenceBeforeSending {
+		if _, ok := s.RegisterCache.Get(from); !ok {
+			if s.Config.Debug {
+				fmt.Printf("/message: 'from' not in locally registered phones: %s\n", from)
+			}
+			d.Success = false
+			d.Message = "'from' phone number is not locally registered"
+			if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
+				http.Error(w, "unable to write response", http.StatusInternalServerError)
+			}
+			return
+		}
+	}
 
 	to := r.FormValue("to")
 	to = strings.ToLower(strings.TrimSpace(to))

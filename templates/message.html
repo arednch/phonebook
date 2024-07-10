@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Phonebook: Message</title>
+    <link href="http://localnode.local.mesh/bootstrap.min.css" rel="stylesheet">
+	</head>
+
+  <body>
+  
+		<div class="container">
+      <div class="row">
+        <div class="col">
+          <h1>Phonebook: Message</h1>
+        </div>
+      </div> 
+      <div class="alert alert-secondary">
+        <div class="row">
+          <div class="col"> 
+            Version: {{ .Version }}
+          </div>
+        </div>
+      </div>
+
+      {{ if .Success }}
+        <div class="alert alert-success">
+          <div class="row">
+            <div class="col">
+              Message sent (reception unconfirmed):
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              From: 
+            </div>
+            <div class="col">
+              {{ .From }}
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              To: 
+            </div>
+            <div class="col">
+              {{ .To }}
+            </div>
+          </div>
+          <div class="row">
+            <div class="col">
+              Message: 
+            </div>
+            <div class="col">
+              {{ .Message }}
+            </div>
+          </div>
+        </div>
+      {{ else }}
+        <div class="alert alert-danger">
+          <div class="row">
+            <div class="col">
+              {{ .Message }}
+            </div>
+          </div>
+        </div>
+      {{ end }}
+
+  </body>
+</html>

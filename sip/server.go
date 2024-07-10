@@ -15,6 +15,9 @@ import (
 
 const (
 	registerExpiration = 10 * time.Minute
+
+	// UDP Port where phones are expected to listen on.
+	expectedPhoneSIPPort = 5060
 )
 
 type Server struct {
@@ -63,6 +66,24 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 			pc.WriteTo(resp.Serialize(), addr)
 		}(pc, addr, buf[:n])
 	}
+}
+
+func (s Server) SendSIPMessage(req *data.SIPRequest) (*data.SIPResponse, error) {
+	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", req.To().URI.Host, expectedPhoneSIPPort))
+	if err != nil {
+		return nil, fmt.Errorf("error connecting: %s", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.Write(req.Serialize()); err != nil {
+		return nil, fmt.Errorf("error sending message: %s", err)
+	}
+	if s.Config.Debug {
+		fmt.Printf("SIP/SendSIPMessage:\n%+v\n", string(req.Serialize()))
+	}
+
+	// TODO: Handle response instead of ignoring it.
+	return nil, nil
 }
 
 func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) {

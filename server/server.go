@@ -19,19 +19,21 @@ import (
 )
 
 type ReloadFunc func(cfg *configuration.Config) (string, error)
+type SendSIPMessage func(*data.SIPRequest) (*data.SIPResponse, error)
 
-func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo, exporters map[string]exporter.Exporter, updates *data.Updates, refreshRecords ReloadFunc, registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template) *Server {
+func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo, exporters map[string]exporter.Exporter, updates *data.Updates, refreshRecords ReloadFunc, sendSIPMessage SendSIPMessage, registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template) *Server {
 	return &Server{
-		Version:       version,
-		Config:        cfg,
-		ConfigPath:    cfgPath,
-		Records:       records,
-		RuntimeInfo:   runtimeInfo,
-		Updates:       updates,
-		Exporters:     exporters,
-		RegisterCache: registerCache,
-		ReloadFn:      refreshRecords,
-		Tmpls:         tmpls,
+		Version:        version,
+		Config:         cfg,
+		ConfigPath:     cfgPath,
+		Records:        records,
+		RuntimeInfo:    runtimeInfo,
+		Updates:        updates,
+		Exporters:      exporters,
+		RegisterCache:  registerCache,
+		ReloadFn:       refreshRecords,
+		SendSIPMessage: sendSIPMessage,
+		Tmpls:          tmpls,
 	}
 }
 
@@ -46,7 +48,8 @@ type Server struct {
 	Exporters     map[string]exporter.Exporter
 	RegisterCache *data.TTLCache[string, *data.SIPClient]
 
-	ReloadFn ReloadFunc
+	ReloadFn       ReloadFunc
+	SendSIPMessage SendSIPMessage
 
 	Tmpls *template.Template
 }
@@ -85,6 +88,15 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	s.Updates.Mu.RLock()
 	defer s.Updates.Mu.RUnlock()
 
+	recs := make(map[string]string)
+	for _, e := range s.Records.Entries {
+		var pfx string
+		if s.Config.IndicateActive && e.OLSR != nil {
+			pfx = s.Config.ActivePfx
+		}
+		recs[e.PhoneNumber] = e.DisplayName(pfx)
+	}
+
 	sort.Strings(exp)
 	data := data.WebIndex{
 		Version:    s.Version.Version,
@@ -92,6 +104,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 		Updates:    s.Updates.Updates,
 		UpdateURLs: strings.Join(s.Config.UpdateURLs, "\n"),
 		Sources:    strings.Join(s.Config.Sources, "\n"),
+		Records:    recs,
 		Exporters:  exp,
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
@@ -139,6 +152,104 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
+	d := data.WebMessage{
+		Version: s.Version.Version,
+		Success: true,
+	}
+
+	from := r.FormValue("from")
+	from = strings.ToLower(strings.TrimSpace(from))
+	if from == "" {
+		if s.Config.Debug {
+			fmt.Printf("/message: 'from' not specified: %s\n", from)
+		}
+		d.Success = false
+		d.Message = "'from' not specified"
+		if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
+			http.Error(w, "unable from write response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// if _, ok := s.RegisterCache.Get(from); !ok {
+	// 	if s.Config.Debug {
+	// 		fmt.Printf("/message: 'from' not in locally registered phones: %s\n", from)
+	// 	}
+	// 	d.Success = false
+	// 	d.Message = "'from' phone number is not locally registered"
+	// 	if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
+	// 		http.Error(w, "unable to write response", http.StatusInternalServerError)
+	// 	}
+	// 	return
+	// }
+
+	to := r.FormValue("to")
+	to = strings.ToLower(strings.TrimSpace(to))
+	if to == "" {
+		if s.Config.Debug {
+			fmt.Printf("/message: 'to' not specified: %s\n", to)
+		}
+		d.Success = false
+		d.Message = "'to' not specified"
+		if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	msg := r.FormValue("msg")
+	msg = strings.ToLower(strings.TrimSpace(msg))
+	if to == "" {
+		if s.Config.Debug {
+			fmt.Printf("/message: 'msg' not specified: %s\n", to)
+		}
+		d.Success = false
+		d.Message = "'msg' not specified"
+		if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
+			http.Error(w, "unable to write response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	d.From = from
+	d.To = to
+	d.Message = msg
+	te := data.Entry{PhoneNumber: to}
+	t := &data.SIPAddress{
+		DisplayName: to,
+		URI: &data.SIPURI{
+			User: to,
+			Host: te.PhoneFQDN(),
+		},
+	}
+	fe := data.Entry{PhoneNumber: from}
+	f := &data.SIPAddress{
+		DisplayName: from,
+		URI: &data.SIPURI{
+			User: from,
+			Host: fe.PhoneFQDN(),
+		},
+	}
+	hdrs := []*data.SIPHeader{
+		{
+			Name:  "Content-Type",
+			Value: "text/plain",
+		},
+	}
+	req := data.NewSIPRequest("MESSAGE", f, t, 1, hdrs, []byte(msg))
+	if _, err := s.SendSIPMessage(req); err != nil {
+		if s.Config.Debug {
+			fmt.Printf("/message: message could not be sent: %s\n", err)
+		}
+		d.Success = false
+		d.Message = "message could not be sent"
+	}
+	if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
+		http.Error(w, "unable to write response", http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	data := data.WebShowConfig{
 		Version: s.Version.Version,
@@ -148,10 +259,10 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	t := r.FormValue("type")
 	t = strings.ToLower(strings.TrimSpace(t))
 	if t == "" {
-		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/showconfig: 'type' not specified: %+v\n", r)
 		}
+		data.Success = false
 		data.Messages = append(data.Messages, "'type' must be specified: [disk,runtime,diff]")
 		if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
 			http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -172,10 +283,10 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		var err error
 		if cfg, err = configuration.ReadFromJSON(s.ConfigPath); err != nil {
-			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/showconfig: unable to read config: %s\n", err)
 			}
+			data.Success = false
 			data.Messages = append(data.Messages, "unable to read config")
 			if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
 				http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -185,10 +296,10 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	case t == "r" || t == "runtime":
 		cfg = s.Config
 	default:
-		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/showconfig: 'type' %q not as expected: %+v\n", t, r)
 		}
+		data.Success = false
 		data.Messages = append(data.Messages, "'type' must be specified: [disk,runtime]")
 		if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
 			http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -199,10 +310,10 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	if t != "diff" {
 		config, err := configuration.ConvertToJSON(*cfg, true)
 		if err != nil {
-			data.Success = false
 			if s.Config.Debug {
 				fmt.Printf("/showconfig: unable to convert config: %s\n", err)
 			}
+			data.Success = false
 			data.Messages = append(data.Messages, "unable to convert config")
 			if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
 				http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -219,10 +330,10 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 
 	diffs, err := s.Config.Diff(cfg)
 	if err != nil {
-		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/showconfig: unable to diff configs: %s\n", err)
 		}
+		data.Success = false
 		data.Messages = append(data.Messages, "unable to diff config")
 		if err := s.Tmpls.ExecuteTemplate(w, "showconfig.html", data); err != nil {
 			http.Error(w, "unable to write response", http.StatusInternalServerError)

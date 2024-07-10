@@ -55,6 +55,21 @@ type Entry struct {
 	OLSR *OLSR // if present, the participant seems to be active
 }
 
+func (e *Entry) DisplayName(pfx string) string {
+	switch {
+	case e.LastName == "" && e.FirstName == "" && e.Callsign == "":
+		return pfx + e.PhoneNumber
+	case e.LastName == "" && e.FirstName == "":
+		return pfx + e.Callsign
+	case e.LastName == "":
+		return fmt.Sprintf("%s%s (%s)", pfx, e.FirstName, e.Callsign)
+	case e.FirstName == "":
+		return fmt.Sprintf("%s%s (%s)", pfx, e.LastName, e.Callsign)
+	default:
+		return fmt.Sprintf("%s%s %s (%s)", pfx, e.LastName, e.FirstName, e.Callsign)
+	}
+}
+
 func (e *Entry) DirectCallAddress() string {
 	return e.PhoneNumber + "@" + e.PhoneFQDN()
 }

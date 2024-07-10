@@ -406,7 +406,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 		return err
 	}
 	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
-	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecords, sipSrv.RegisterCache, tmpls)
+	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecords, sipSrv.SendSIPMessage, sipSrv.RegisterCache, tmpls)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
 	http.HandleFunc("/", srv.Index)
 	http.HandleFunc("/index.html", srv.Index)
@@ -416,6 +416,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 		if cfg.Debug {
 			fmt.Println("protecting most web endpoints with configured basicAuth user/pwd")
 		}
+		http.HandleFunc("/message", srv.BasicAuth(srv.SendMessage))
 		http.HandleFunc("/reload", srv.BasicAuth(srv.ReloadPhonebook))
 		http.HandleFunc("/showconfig", srv.BasicAuth(srv.ShowConfig))
 		http.HandleFunc("/updateconfig", srv.BasicAuth(srv.UpdateConfig))
@@ -423,6 +424,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 		if cfg.Debug {
 			fmt.Println("not protecting any of the web endpoints with basicAuth as not both user/pwd were set")
 		}
+		http.HandleFunc("/message", srv.SendMessage)
 		http.HandleFunc("/reload", srv.ReloadPhonebook)
 		http.HandleFunc("/showconfig", srv.ShowConfig)
 		http.HandleFunc("/updateconfig", srv.UpdateConfig)

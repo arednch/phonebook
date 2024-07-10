@@ -260,6 +260,24 @@ Optional parameters:
 
 - n/a
 
+#### /message
+
+This endpoint allows sending a SIP message to another participant.
+
+Example: http://localnode.local.mesh:8081/message?to=800030&msg=test%20message
+
+BasicAuth protection: Yes.
+
+Required parameters:
+
+- `from`: Phone number of the sender.
+- `to`: Phone number of a recipient.
+- `msg`: Message to send.
+
+Optional parameters:
+
+- n/a
+
 #### /showconfig
 
 This endpoint returns the currently loaded phonebook configuration in JSON format.
@@ -285,7 +303,7 @@ Optional parameters:
 
 This endpoint allows to update a limited set of configuration settings.
 
-Example: http://localnode.local.mesh:8081/updateconfig?source=http://hb9edi-vm-gw.local.mesh/filerepo/Phonebook/AREDN_Phonebook.csv
+Example: http://localnode.local.mesh:8081/updateconfig?sources=http://hb9edi-vm-gw.local.mesh/filerepo/Phonebook/AREDN_Phonebook.csv
 
 BasicAuth protection: Yes.
 

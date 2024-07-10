@@ -25,10 +25,20 @@ type WebIndex struct {
 	Version string
 	Updated string
 
+	Records    map[string]string
 	Updates    []*Update
 	UpdateURLs string
 	Sources    string
 	Exporters  []string
+}
+
+type WebMessage struct {
+	Version string
+
+	Success bool
+	From    string
+	To      string
+	Message string
 }
 
 type WebReload struct {

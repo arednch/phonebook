@@ -5,9 +5,23 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 )
+
+const (
+	DefaultSIPVersion  = "SIP/2.0"
+	DefaultMaxForwards = "30"
+)
+
+func GenerateCallID(host string) string {
+	return fmt.Sprintf("%d@%s", rand.Int(), host)
+}
+
+func GenerateFromTag() string {
+	return strconv.Itoa(rand.Int())
+}
 
 type SIPMessage struct {
 	SIPVersion string // Set to 2.0 version by default
@@ -75,6 +89,42 @@ func (m *SIPMessage) RemoveHeaders(name string) {
 	m.Headers = hdrs
 }
 
+func NewSIPRequest(method string, from, to *SIPAddress, seq int, hdrs []*SIPHeader, body []byte) *SIPRequest {
+	resp := &SIPRequest{
+		SIPMessage: SIPMessage{
+			SIPVersion: DefaultSIPVersion,
+			Headers: []*SIPHeader{
+				{
+					Name:  "Via",
+					Value: fmt.Sprintf("%s/UDP %s", DefaultSIPVersion, from.URI.Host),
+				}, {
+					Name:    "From",
+					Value:   from.String(),
+					Address: from,
+				}, {
+					Name:    "To",
+					Value:   to.String(),
+					Address: to,
+				}, {
+					Name:  "Call-ID",
+					Value: GenerateCallID(from.URI.Host),
+				}, {
+					Name:  "CSeq",
+					Value: fmt.Sprintf("%d %s", seq, method),
+				}, {
+					Name:  "Max-Forwards",
+					Value: DefaultMaxForwards,
+				},
+			},
+			Body: body,
+		},
+		Method: method,
+		URI:    to.URI.String(),
+	}
+	resp.Headers = append(resp.Headers, hdrs...)
+	return resp
+}
+
 type SIPRequest struct {
 	SIPMessage
 	Method string
@@ -110,6 +160,37 @@ func (r *SIPRequest) Parse(data []byte) error {
 		return fmt.Errorf("error parsing data: %s", err)
 	}
 	return nil
+}
+
+func (r *SIPRequest) Serialize() []byte {
+	buf := bytes.Buffer{}
+
+	// Status line
+	buf.WriteString(r.Method)
+	buf.WriteString(" ")
+	buf.WriteString(r.To().URI.String())
+	buf.WriteString(" ")
+	buf.WriteString(r.SIPVersion)
+	buf.WriteString("\r\n")
+
+	// Headers
+	for _, hdr := range r.Headers {
+		buf.WriteString(hdr.serialize())
+		buf.WriteString("\r\n")
+	}
+	buf.WriteString("Content-Length: ")
+	buf.WriteString(strconv.Itoa(len(r.Body)))
+	buf.WriteString("\r\n")
+
+	// Empty line
+	buf.WriteString("\r\n")
+
+	// Body
+	if r.Body != nil {
+		buf.Write(r.Body)
+	}
+
+	return buf.Bytes()
 }
 
 func (r *SIPRequest) parseSIPRequestStart(line string) error {

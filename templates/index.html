@@ -139,8 +139,8 @@
 
           <div class="row">
             <div class="col">
-              <form action="/message">
-                
+              <form action="/message" method="POST">
+
                 <datalist id="messageContacts" name="to" placeholder="Contact / Phone number to send the message to">
                   {{ range $name, $phone := .Records }}
                     <option value="{{ $phone }}">{{ $name }}</option>
@@ -223,7 +223,7 @@
 
           <div class="row">
             <div class="col">
-              <form action="/showconfig">
+              <form action="/showconfig" method="POST">
 
                 <div class="mb-3">
                   <input class="form-check-input" type="radio" id="configTypeRuntime" name="type" value="runtime" checked>
@@ -254,7 +254,7 @@
             </div>
           </div>
 
-          <form action="/updateconfig">
+          <form action="/updateconfig" method="POST">
 
             <div class="row">
               <div class="col">

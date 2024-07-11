@@ -69,7 +69,12 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 }
 
 func (s Server) SendSIPMessage(req *data.SIPRequest) (*data.SIPResponse, error) {
-	conn, err := net.Dial("udp", fmt.Sprintf("%s:%d", req.To().URI.Host, expectedPhoneSIPPort))
+	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", req.To().URI.Host, expectedPhoneSIPPort))
+	if err != nil {
+		return nil, fmt.Errorf("error resolving the destination address: %s", err)
+	}
+
+	conn, err := net.DialUDP("udp", nil, raddr)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting: %s", err)
 	}
@@ -82,8 +87,15 @@ func (s Server) SendSIPMessage(req *data.SIPRequest) (*data.SIPResponse, error) 
 		fmt.Printf("SIP/SendSIPMessage:\n%+v\n", string(req.Serialize()))
 	}
 
-	// TODO: Handle response instead of ignoring it.
-	return nil, nil
+	received := make([]byte, 1024)
+	if _, err = conn.Read(received); err != nil {
+		return nil, fmt.Errorf("unable to receive response: %s", err)
+	}
+	resp := &data.SIPResponse{}
+	if err := resp.Parse(received); err != nil {
+		return nil, fmt.Errorf("unable to parse body: %s", err)
+	}
+	return resp, nil
 }
 
 func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) {

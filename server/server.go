@@ -278,12 +278,18 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	req := data.NewSIPRequest("MESSAGE", f, t, 1, hdrs, []byte(msg))
-	if _, err := s.SendSIPMessage(req); err != nil {
+	if resp, err := s.SendSIPMessage(req); err != nil {
 		if s.Config.Debug {
 			fmt.Printf("/message: message could not be sent: %s\n", err)
 		}
 		d.Success = false
 		d.Message = "message could not be sent"
+	} else if resp.StatusCode != http.StatusOK {
+		if s.Config.Debug {
+			fmt.Printf("/message: message response not successful (%d)\n", resp.StatusCode)
+		}
+		d.Success = false
+		d.Message = fmt.Sprintf("message sent but response not ok (%d)", resp.StatusCode)
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "message.html", d); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)

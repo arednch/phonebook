@@ -140,15 +140,14 @@ func (r *SIPRequest) Parse(data []byte) error {
 		i += 1
 
 		// Check if we reached the end of the header.
-		// Parsing the body is not implemented yet.
 		if line == "" {
-			return nil
+			break
 		}
 
 		// This should be the first line of the received request.
 		if i == 1 {
 			if err := r.parseSIPRequestStart(line); err != nil {
-				return fmt.Errorf("error parsing request header: %s", err)
+				return fmt.Errorf("error parsing request start: %s", err)
 			}
 		} else {
 			if err := r.parseSIPHeader(line); err != nil {
@@ -156,8 +155,28 @@ func (r *SIPRequest) Parse(data []byte) error {
 			}
 		}
 	}
+	var len int
+	for _, hdr := range r.FindHeaders("Content-Length") {
+		l, err := strconv.Atoi(hdr.Value)
+		if err != nil {
+			continue
+		}
+		len = l
+		break
+	}
+	// Check if we have a body and if not, return already
+	if len == 0 {
+		if err := scanner.Err(); err != nil {
+			return fmt.Errorf("error parsing headers: %s", err)
+		}
+		return nil
+	}
+
+	for scanner.Scan() {
+		r.Body = append(r.Body, scanner.Bytes()...)
+	}
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error parsing data: %s", err)
+		return fmt.Errorf("error parsing body: %s", err)
 	}
 	return nil
 }
@@ -253,6 +272,83 @@ type SIPResponse struct {
 	SIPMessage
 	StatusCode    int
 	StatusMessage string
+}
+
+func (r *SIPResponse) Parse(data []byte) error {
+	var i int
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := scanner.Text()
+		line = strings.TrimSpace(line)
+		i += 1
+
+		// Check if we reached the end of the header.
+		if line == "" {
+			break
+		}
+
+		// This should be the first line of the received response.
+		if i == 1 {
+			if err := r.parseSIPResponseStatus(line); err != nil {
+				return fmt.Errorf("error parsing response status: %s", err)
+			}
+		} else {
+			if err := r.parseSIPHeader(line); err != nil {
+				return fmt.Errorf("error parsing request header: %s", err)
+			}
+		}
+	}
+	var len int
+	for _, hdr := range r.FindHeaders("Content-Length") {
+		l, err := strconv.Atoi(hdr.Value)
+		if err != nil {
+			continue
+		}
+		len = l
+		break
+	}
+	// Check if we have a body and if not, return already
+	if len == 0 {
+		if err := scanner.Err(); err != nil {
+			return fmt.Errorf("error parsing headers: %s", err)
+		}
+		return nil
+	}
+
+	for scanner.Scan() {
+		r.Body = append(r.Body, scanner.Bytes()...)
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error parsing body: %s", err)
+	}
+	return nil
+}
+
+func (r *SIPResponse) parseSIPResponseStatus(line string) error {
+	parts := strings.Split(line, " ")
+	if len(parts) != 3 {
+		return fmt.Errorf("SIP request start line should have 3 parts: %s", line)
+	}
+
+	sc, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return fmt.Errorf("unable to convert response code: %s", err)
+	}
+
+	r.SIPVersion = strings.ToUpper(parts[0])
+	r.StatusCode = sc
+	r.StatusMessage = parts[2]
+
+	return nil
+}
+
+func (r *SIPResponse) parseSIPHeader(line string) error {
+	hdr := &SIPHeader{}
+	if err := hdr.parse(line); err != nil {
+		return err
+	}
+	r.Headers = append(r.Headers, hdr)
+	return nil
 }
 
 func (r *SIPResponse) Serialize() []byte {

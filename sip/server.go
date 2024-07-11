@@ -38,7 +38,7 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 	defer pc.Close()
 
 	for {
-		buf := make([]byte, 1024)
+		buf := make([]byte, 4096)
 		n, addr, err := pc.ReadFrom(buf)
 		if err != nil || n == 0 {
 			continue
@@ -106,6 +106,8 @@ func (s *Server) handleRequest(req *data.SIPRequest) (*data.SIPResponse, error) 
 		return s.handleInvite(req)
 	case "ACK":
 		return s.handleAck(req)
+	case "MESSAGE":
+		return s.handleMessage(req)
 	case "":
 		return nil, nil // we are not reacting to empty requests
 	default:
@@ -196,4 +198,11 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 	redirect.Params["reason"] = "unconditional"
 	resp.AddHeader("Diversion", redirect.String())
 	return resp, nil
+}
+
+func (s *Server) handleMessage(req *data.SIPRequest) (*data.SIPResponse, error) {
+	if s.Config.Debug {
+		fmt.Printf("SIP/MESSAGE: received MESSAGE message from %s to %s\n", req.From(), req.To())
+	}
+	return s.SendSIPMessage(req)
 }

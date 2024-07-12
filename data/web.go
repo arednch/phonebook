@@ -3,10 +3,10 @@ package data
 import "time"
 
 type WebInfo struct {
-	Version     Version     `json:"version"`
-	Registered  []string    `json:"registered_phones,omitempty"`
-	RecordStats RecordStats `json:"records_stats,omitempty"`
-	Runtime     Runtime     `json:"runtime,omitempty"`
+	Version     Version           `json:"version"`
+	Registered  map[string]string `json:"registered_phones,omitempty"`
+	RecordStats RecordStats       `json:"records_stats,omitempty"`
+	Runtime     Runtime           `json:"runtime,omitempty"`
 }
 
 type Runtime struct {
@@ -25,6 +25,7 @@ type WebIndex struct {
 	Version string
 	Updated string
 
+	Registered map[string]string
 	Records    map[string]string
 	Updates    []*Update
 	UpdateURLs string

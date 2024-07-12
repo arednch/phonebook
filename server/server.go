@@ -89,6 +89,17 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(exp)
 
+	registered := make(map[string]string)
+	if s.RegisterCache != nil {
+		for _, k := range s.RegisterCache.Keys() {
+			v, ok := s.RegisterCache.Get(k)
+			if !ok {
+				continue
+			}
+			registered[k] = v.UA
+		}
+	}
+
 	s.Records.Mu.RLock()
 	defer s.Records.Mu.RUnlock()
 
@@ -111,6 +122,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 		Sources:    strings.Join(s.Config.Sources, "\n"),
 		Records:    recs,
 		Exporters:  exp,
+		Registered: registered,
 	}
 	if err := s.Tmpls.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, "unable to write response", http.StatusInternalServerError)
@@ -129,7 +141,14 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.RegisterCache != nil {
-		info.Registered = s.RegisterCache.Keys()
+		info.Registered = make(map[string]string)
+		for _, k := range s.RegisterCache.Keys() {
+			v, ok := s.RegisterCache.Get(k)
+			if !ok {
+				continue
+			}
+			info.Registered[k] = v.UA
+		}
 	}
 
 	if s.RuntimeInfo != nil && s.RuntimeInfo.SysInfo != nil {

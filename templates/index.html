@@ -52,6 +52,28 @@
         <div class="alert alert-secondary">
           <div class="row">
             <div class="col"> 
+              <h3>Locally registered phones</h3>
+            </div>
+          </div>
+
+          {{ range $phone, $ua := .Registered }}
+            <div class="row">
+              <div class="col">
+                - {{ $phone }} ({{ $ua }})
+              </div>
+            </div>
+          {{ else }}
+            <div class="row">
+              <div class="col">
+                -
+              </div>
+            </div>
+          {{ end }}
+        </div>
+
+        <div class="alert alert-secondary">
+          <div class="row">
+            <div class="col"> 
               <h3>Show phonebook entries</h3>
             </div>
           </div>

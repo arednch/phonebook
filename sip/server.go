@@ -18,6 +18,16 @@ const (
 
 	// UDP Port where phones are expected to listen on.
 	expectedPhoneSIPPort = 5060
+
+	maxPacketSize = 1024
+)
+
+var (
+	supported = []string{
+		"INVITE",
+		"ACK",
+		"MESSAGE",
+	}
 )
 
 type Server struct {
@@ -38,37 +48,46 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 	defer pc.Close()
 
 	for {
-		buf := make([]byte, 4096)
+		buf := make([]byte, maxPacketSize)
 		n, addr, err := pc.ReadFrom(buf)
-		if err != nil || n == 0 {
+		if err != nil && s.Config.Debug {
+			fmt.Printf("SIP: error reading (%d bytes) from conn: %s", n, err)
 			continue
 		}
-
-		go func(pc net.PacketConn, addr net.Addr, buf []byte) {
-			if s.Config.Debug {
-				fmt.Printf("SIP/Request:\n%+v\n", string(buf))
-			}
-
-			req := &data.SIPRequest{}
-			if err := req.Parse(buf); err != nil {
-				return
-			}
-
-			resp, err := s.handleRequest(req)
-			if err != nil || resp == nil {
-				return
-			}
-
-			if s.Config.Debug {
-				fmt.Printf("SIP/Response:\n%+v\n", string(resp.Serialize()))
-			}
-
-			pc.WriteTo(resp.Serialize(), addr)
-		}(pc, addr, buf[:n])
+		if n == 0 {
+			continue
+		}
+		go s.handlePacket(pc, addr, buf[:n])
 	}
 }
 
-func (s Server) SendSIPMessage(req *data.SIPRequest) (*data.SIPResponse, error) {
+func (s *Server) handlePacket(pc net.PacketConn, addr net.Addr, buf []byte) {
+	if s.Config.Debug {
+		fmt.Printf("SIP/Request (%d bytes):\n%s\n", len(buf), string(buf))
+	}
+	if strings.TrimSpace(string(buf)) == "" {
+		return
+	}
+	req := &data.SIPRequest{}
+	if err := req.Parse(buf); err != nil {
+		return
+	}
+
+	resp, err := s.handleRequest(req)
+	if err != nil || resp == nil {
+		return
+	}
+
+	out := resp.Serialize(true)
+	if s.Config.Debug {
+		fmt.Printf("SIP/Response (%d bytes):\n%s\n", (len(out)), string(out))
+	}
+	if _, err := pc.WriteTo(out, addr); s.Config.Debug && err != nil {
+		fmt.Printf("SIP/Response: unable to write: %s", err)
+	}
+}
+
+func (s *Server) SendSIPMessage(req *data.SIPRequest) (*data.SIPResponse, error) {
 	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", req.To().URI.Host, expectedPhoneSIPPort))
 	if err != nil {
 		return nil, fmt.Errorf("error resolving the destination address: %s", err)
@@ -80,11 +99,8 @@ func (s Server) SendSIPMessage(req *data.SIPRequest) (*data.SIPResponse, error) 
 	}
 	defer conn.Close()
 
-	if _, err := conn.Write(req.Serialize()); err != nil {
+	if _, err := req.Write(conn, s.Config.Debug); err != nil {
 		return nil, fmt.Errorf("error sending message: %s", err)
-	}
-	if s.Config.Debug {
-		fmt.Printf("SIP/SendSIPMessage:\n%+v\n", string(req.Serialize()))
 	}
 
 	received := make([]byte, 1024)
@@ -124,6 +140,7 @@ func (s *Server) handleRegister(req *data.SIPRequest) (*data.SIPResponse, error)
 	}
 
 	resp := data.NewSIPResponseFromRequest(req, http.StatusOK, "OK")
+	resp.AddHeader("Allow", strings.Join(supported, ", "))
 	resp.AddHeader("Expires", strconv.Itoa(int(registerExpiration.Seconds())))
 	return resp, nil
 }

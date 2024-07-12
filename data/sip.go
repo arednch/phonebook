@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -13,6 +14,8 @@ import (
 const (
 	DefaultSIPVersion  = "SIP/2.0"
 	DefaultMaxForwards = "30"
+
+	SIPNewline = "\r\n"
 )
 
 func GenerateCallID(host string) string {
@@ -89,6 +92,21 @@ func (m *SIPMessage) RemoveHeaders(name string) {
 	m.Headers = hdrs
 }
 
+func (m *SIPMessage) ContentLength(update bool) (int, error) {
+	len := len(m.Body)
+	for _, hdr := range m.FindHeaders("Content-Length") {
+		l, err := strconv.Atoi(hdr.Value)
+		if err != nil {
+			continue
+		}
+		if update && len != l {
+			hdr.Value = strconv.Itoa(len)
+		}
+		return l, nil
+	}
+	return 0, errors.New("no content length found")
+}
+
 func NewSIPRequest(method string, from, to *SIPAddress, seq int, hdrs []*SIPHeader, body []byte) *SIPRequest {
 	resp := &SIPRequest{
 		SIPMessage: SIPMessage{
@@ -155,17 +173,8 @@ func (r *SIPRequest) Parse(data []byte) error {
 			}
 		}
 	}
-	var len int
-	for _, hdr := range r.FindHeaders("Content-Length") {
-		l, err := strconv.Atoi(hdr.Value)
-		if err != nil {
-			continue
-		}
-		len = l
-		break
-	}
 	// Check if we have a body and if not, return already
-	if len == 0 {
+	if len, _ := r.ContentLength(false); len == 0 {
 		if err := scanner.Err(); err != nil {
 			return fmt.Errorf("error parsing headers: %s", err)
 		}
@@ -181,7 +190,19 @@ func (r *SIPRequest) Parse(data []byte) error {
 	return nil
 }
 
-func (r *SIPRequest) Serialize() []byte {
+func (r *SIPRequest) Write(w io.Writer, dbg bool) (int, error) {
+	out := r.Serialize(true)
+	n, err := w.Write(out)
+	if err != nil {
+		return n, fmt.Errorf("unable to write: %s", err)
+	}
+	if dbg {
+		fmt.Printf("SIP/Request/Write headers (%d bytes):\n%+v\n", n, string(out))
+	}
+	return n, nil
+}
+
+func (r *SIPRequest) Serialize(withBody bool) []byte {
 	buf := bytes.Buffer{}
 
 	// Status line
@@ -190,19 +211,23 @@ func (r *SIPRequest) Serialize() []byte {
 	buf.WriteString(r.To().URI.String())
 	buf.WriteString(" ")
 	buf.WriteString(r.SIPVersion)
-	buf.WriteString("\r\n")
+	buf.WriteString(SIPNewline)
 
 	// Headers
 	for _, hdr := range r.Headers {
 		buf.WriteString(hdr.serialize())
-		buf.WriteString("\r\n")
+		buf.WriteString(SIPNewline)
 	}
 	buf.WriteString("Content-Length: ")
 	buf.WriteString(strconv.Itoa(len(r.Body)))
-	buf.WriteString("\r\n")
+	buf.WriteString(SIPNewline)
+
+	if !withBody {
+		return buf.Bytes()
+	}
 
 	// Empty line
-	buf.WriteString("\r\n")
+	buf.WriteString(SIPNewline)
 
 	// Body
 	if r.Body != nil {
@@ -298,17 +323,8 @@ func (r *SIPResponse) Parse(data []byte) error {
 			}
 		}
 	}
-	var len int
-	for _, hdr := range r.FindHeaders("Content-Length") {
-		l, err := strconv.Atoi(hdr.Value)
-		if err != nil {
-			continue
-		}
-		len = l
-		break
-	}
 	// Check if we have a body and if not, return already
-	if len == 0 {
+	if len, _ := r.ContentLength(false); len == 0 {
 		if err := scanner.Err(); err != nil {
 			return fmt.Errorf("error parsing headers: %s", err)
 		}
@@ -351,7 +367,19 @@ func (r *SIPResponse) parseSIPHeader(line string) error {
 	return nil
 }
 
-func (r *SIPResponse) Serialize() []byte {
+func (r *SIPResponse) Write(w io.Writer, dbg bool) (int, error) {
+	out := r.Serialize(true)
+	n, err := w.Write(out)
+	if err != nil {
+		return n, fmt.Errorf("unable to write: %s", err)
+	}
+	if dbg {
+		fmt.Printf("SIP/Response/Write headers (%d bytes):\n%+v\n", n, string(out))
+	}
+	return n, nil
+}
+
+func (r *SIPResponse) Serialize(withBody bool) []byte {
 	buf := bytes.Buffer{}
 
 	// Status line
@@ -360,19 +388,23 @@ func (r *SIPResponse) Serialize() []byte {
 	buf.WriteString(strconv.Itoa(r.StatusCode))
 	buf.WriteString(" ")
 	buf.WriteString(r.StatusMessage)
-	buf.WriteString("\r\n")
+	buf.WriteString(SIPNewline)
 
 	// Headers
 	for _, hdr := range r.Headers {
 		buf.WriteString(hdr.serialize())
-		buf.WriteString("\r\n")
+		buf.WriteString(SIPNewline)
 	}
 	buf.WriteString("Content-Length: ")
 	buf.WriteString(strconv.Itoa(len(r.Body)))
-	buf.WriteString("\r\n")
+	buf.WriteString(SIPNewline)
+
+	if !withBody {
+		return buf.Bytes()
+	}
 
 	// Empty line
-	buf.WriteString("\r\n")
+	buf.WriteString(SIPNewline)
 
 	// Body
 	if r.Body != nil {
@@ -657,6 +689,7 @@ func (u *SIPURI) String() string {
 
 type SIPClient struct {
 	Address *SIPAddress
+	UA      string
 }
 
 func (c *SIPClient) Key() string {
@@ -671,7 +704,14 @@ func NewSIPClientFromRegister(req *SIPRequest) *SIPClient {
 	addr := req.Contact()
 	addr.URI.Params = make(map[string]string)
 	addr.Params = make(map[string]string)
-	return &SIPClient{
+	client := &SIPClient{
 		Address: addr,
 	}
+
+	for _, hdr := range req.FindHeaders("User-Agent") {
+		client.UA = hdr.Value
+		break
+	}
+
+	return client
 }

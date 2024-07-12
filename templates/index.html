@@ -56,19 +56,17 @@
             </div>
           </div>
 
-          {{ range $phone, $ua := .Registered }}
-            <div class="row">
-              <div class="col">
-                - {{ $phone }} ({{ $ua }})
-              </div>
+          <div class="row">
+            <div class="col">
+              <ul class="list-group">
+                {{ range $phone, $ua := .Registered }}
+                  <li class="list-group-item">{{ $phone }} ({{ $ua }})</li>
+                {{ else }}
+                  -
+                {{ end }}
+              </ul>
             </div>
-          {{ else }}
-            <div class="row">
-              <div class="col">
-                -
-              </div>
-            </div>
-          {{ end }}
+          </div>
         </div>
 
         <div class="alert alert-secondary">

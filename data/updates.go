@@ -14,11 +14,11 @@ type Updates struct {
 
 type Update struct {
 	// Type defines what color the message is rendered in. Supported are:
-	// - "info": Light blue background.
+	// - "info": Light background.
 	// - "warn": Yellow background.
-	// - "danger": Dark red background.
-	// - "success": Dark green background.
-	// - every other value will be rendered with dark grey background.
+	// - "danger": Red background.
+	// - "success": Green background.
+	// - every other value will be rendered with a grey background.
 	// For more details, see https://getbootstrap.com/docs/5.3/components/alerts/
 	Type string `json:"info_type"`
 

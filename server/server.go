@@ -115,7 +115,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	s.Updates.Mu.RLock()
 	defer s.Updates.Mu.RUnlock()
 	data := data.WebIndex{
-		Version:    s.Version.Version,
+		Version:    s.Version,
 		Updated:    s.Records.Updated.Format(time.RFC3339),
 		Updates:    s.Updates.Updates,
 		UpdateURLs: strings.Join(s.Config.UpdateURLs, "\n"),
@@ -133,7 +133,7 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 	s.Records.Mu.RLock()
 	defer s.Records.Mu.RUnlock()
 	info := &data.WebInfo{
-		Version: *s.Version,
+		Version: s.Version,
 		RecordStats: data.RecordStats{
 			Count:   len(s.Records.Entries),
 			Updated: s.Records.Updated,
@@ -178,7 +178,7 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	d := data.WebMessage{
-		Version: s.Version.Version,
+		Version: s.Version,
 		Success: true,
 	}
 
@@ -317,7 +317,7 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	data := data.WebShowConfig{
-		Version: s.Version.Version,
+		Version: s.Version,
 		Success: true,
 	}
 
@@ -415,7 +415,7 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	data := data.WebUpdateConfig{
-		Version: s.Version.Version,
+		Version: s.Version,
 		Success: true,
 	}
 
@@ -800,7 +800,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
 	data := data.WebReload{
-		Version: s.Version.Version,
+		Version: s.Version,
 		Updated: s.Records.Updated.Format(time.RFC3339),
 		Success: true,
 	}

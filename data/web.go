@@ -3,7 +3,7 @@ package data
 import "time"
 
 type WebInfo struct {
-	Version     Version           `json:"version"`
+	Version     *Version          `json:"version"`
 	Registered  map[string]string `json:"registered_phones,omitempty"`
 	RecordStats RecordStats       `json:"records_stats,omitempty"`
 	Runtime     Runtime           `json:"runtime,omitempty"`
@@ -22,7 +22,7 @@ type RecordStats struct {
 }
 
 type WebIndex struct {
-	Version string
+	Version *Version
 	Updated string
 
 	Registered map[string]string
@@ -34,7 +34,7 @@ type WebIndex struct {
 }
 
 type WebMessage struct {
-	Version string
+	Version *Version
 
 	Success bool
 	From    string
@@ -43,7 +43,7 @@ type WebMessage struct {
 }
 
 type WebReload struct {
-	Version string
+	Version *Version
 	Updated string
 
 	Source  string
@@ -51,7 +51,7 @@ type WebReload struct {
 }
 
 type WebShowConfig struct {
-	Version string
+	Version *Version
 
 	Messages []string
 	Content  string
@@ -60,7 +60,7 @@ type WebShowConfig struct {
 }
 
 type WebUpdateConfig struct {
-	Version string
+	Version *Version
 
 	Messages []string
 	Success  bool

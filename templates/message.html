@@ -27,7 +27,7 @@
             {{ if eq .Version.CommitSHA "-" }}
               not comitted/pushed yet (dev version)
             {{ else }}
-              "<a href="https://github.com/arednch/phonebook/commit/{{ .Version.CommitSHA }}">{{ .Version.CommitSHA }}</a>"
+              "<a href="https://github.com/arednch/phonebook/tree/{{ .Version.CommitSHA }}">{{ .Version.CommitSHA }}</a>"
             {{ end }}
           </div>
         </div>

@@ -40,6 +40,8 @@ func ReadFromURL(url string, cache string) ([]byte, error) {
 
 	if err := os.WriteFile(cache, body, 0664); err != nil {
 		fmt.Printf("Unable to write downloaded file to cache: %s\n", err)
+	} else {
+		fmt.Printf("Locally cached downloaded file: %q\n", err)
 	}
 	return body, nil
 }

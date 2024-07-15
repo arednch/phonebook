@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -21,28 +22,40 @@ const (
 	headerPrivate     = "privat"
 )
 
-func ReadFromURL(url string) ([]byte, error) {
+func ReadFromURL(url string, cache string) ([]byte, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	resp.Body.Close()
+
+	if cache == "" {
+		return body, nil
+	}
+
+	if err := os.WriteFile(cache, body, 0664); err != nil {
+		fmt.Printf("Unable to write downloaded file to cache: %s\n", err)
+	}
+	return body, nil
 }
 
 func ReadFromFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func ReadPhonebook(path string) ([]*data.Entry, error) {
+func ReadPhonebook(path string, cache string) ([]*data.Entry, error) {
 	var blob []byte
 	var err error
 	switch {
 	case strings.HasPrefix(path, "http://"):
 		fallthrough
 	case strings.HasPrefix(path, "https://"):
-		blob, err = ReadFromURL(path)
+		blob, err = ReadFromURL(path, cache)
 	case strings.HasPrefix(path, "/"):
 		blob, err = ReadFromFile(path)
 	default:
@@ -113,7 +126,7 @@ func ReadPhonebook(path string) ([]*data.Entry, error) {
 }
 
 func ReadSysInfoFromURL(url string) (*data.SysInfo, error) {
-	b, err := ReadFromURL(url)
+	b, err := ReadFromURL(url, "")
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +141,7 @@ func ReadSysInfoFromURL(url string) (*data.SysInfo, error) {
 
 func ReadUpdatesFromURL(urls []string) ([]*data.Update, error) {
 	for _, url := range urls {
-		b, err := ReadFromURL(url)
+		b, err := ReadFromURL(url, "")
 		if err != nil {
 			continue
 		}

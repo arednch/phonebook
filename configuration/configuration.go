@@ -53,6 +53,7 @@ type Config struct {
 
 	// Only relevant when running in server mode.
 	Port          int           `json:"port"`
+	Cache         string        `json:"cache"`
 	ReloadSeconds int           `json:"reload_seconds"`
 	Reload        time.Duration `json:"-"`
 	WebUser       string        `json:"web_user"`

@@ -43,6 +43,7 @@ Only relevant when running in **non-server / ad-hoc mode**:
 Only relevant when running in **server mode**:
 
 - `port`: Port to listen on (when running as a server). Default: `8081`
+- `cache`: Local folder to cache the downloaded phonebook CSV in (for reliability when the network goes down). Default: `/www/phonebook.csv`
 - `reload`: Duration after which to try to reload the phonebook source. Default: `1h`
 - `update_urls`: Comma separated list of URLs to fetch information from (used to send optional messages to users). Default: None.
 - `web_user`: Username to protect many of the web endpoints with (BasicAuth). Default: None

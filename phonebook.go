@@ -55,6 +55,7 @@ var (
 
 	// Only relevant when running in server mode.
 	port       = flag.Int("port", 8081, "Port to listen on (when running as a server).")
+	cache      = flag.String("cache", "/www/phonebook.csv", "Path to a local folder to cache the downloaded CSV in.")
 	reload     = flag.Duration("reload", time.Hour, "Duration after which to try to reload the phonebook source.")
 	webUser    = flag.String("web_user", "", "Username to protect many of the web endpoints with (BasicAuth). Default: None")
 	webPwd     = flag.String("web_pwd", "", "Password to protect many of the web endpoints with (BasicAuth). Default: None")
@@ -166,12 +167,23 @@ func refreshRecords(cfg *configuration.Config) (string, error) {
 		if cfg.Debug {
 			fmt.Printf("Reading phonebook from %q\n", src)
 		}
-		rec, err = importer.ReadPhonebook(src)
+		rec, err = importer.ReadPhonebook(src, cfg.Cache)
 		if err == nil {
 			updatedFrom = src
 			break
 		}
 	}
+	// File can't be loaded from the network, try to read it from cache.
+	if rec == nil && cfg.Cache != "" {
+		rec, err = importer.ReadPhonebook(cfg.Cache, "")
+		if err == nil {
+			if cfg.Debug {
+				fmt.Printf("Reading phonebook from cache: %q\n", cfg.Cache)
+			}
+			updatedFrom = cfg.Cache
+		}
+	}
+	// File is not even in cache yet so we have no choice but try later.
 	if rec == nil {
 		return "", fmt.Errorf("error reading phonebook: %s", err)
 	}
@@ -503,6 +515,7 @@ func main() {
 			IncludeRoutable:             *includeRoutable,
 			CountryPrefix:               *countryPfx,
 			Port:                        *port,
+			Cache:                       *cache,
 			Reload:                      *reload,
 			WebUser:                     *webUser,
 			WebPwd:                      *webPwd,

@@ -509,7 +509,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case strings.HasPrefix(src, "/"):
-			if _, err := importer.ReadPhonebook(src); err != nil {
+			if _, err := importer.ReadPhonebook(src, s.Config.Cache); err != nil {
 				if s.Config.Debug {
 					fmt.Printf("/updateconfig: specified source are not all readable: %s\n", err)
 				}

@@ -22,8 +22,8 @@ const (
 	headerPrivate     = "privat"
 )
 
-func ReadFromURL(url string, cache string) ([]byte, error) {
-	resp, err := http.Get(url)
+func ReadFromURL(url string, cache string, client *http.Client) ([]byte, error) {
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -50,14 +50,14 @@ func ReadFromFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func ReadPhonebook(path string, cache string) ([]*data.Entry, error) {
+func ReadPhonebook(path string, cache string, client *http.Client) ([]*data.Entry, error) {
 	var blob []byte
 	var err error
 	switch {
 	case strings.HasPrefix(path, "http://"):
 		fallthrough
 	case strings.HasPrefix(path, "https://"):
-		blob, err = ReadFromURL(path, cache)
+		blob, err = ReadFromURL(path, cache, client)
 	case strings.HasPrefix(path, "/"):
 		blob, err = ReadFromFile(path)
 	default:
@@ -127,8 +127,8 @@ func ReadPhonebook(path string, cache string) ([]*data.Entry, error) {
 	return records, nil
 }
 
-func ReadSysInfoFromURL(url string) (*data.SysInfo, error) {
-	b, err := ReadFromURL(url, "")
+func ReadSysInfoFromURL(url string, client *http.Client) (*data.SysInfo, error) {
+	b, err := ReadFromURL(url, "", client)
 	if err != nil {
 		return nil, err
 	}
@@ -141,9 +141,9 @@ func ReadSysInfoFromURL(url string) (*data.SysInfo, error) {
 	return &sysinfo, nil
 }
 
-func ReadUpdatesFromURL(urls []string) ([]*data.Update, error) {
+func ReadUpdatesFromURL(urls []string, client *http.Client) ([]*data.Update, error) {
 	for _, url := range urls {
-		b, err := ReadFromURL(url, "")
+		b, err := ReadFromURL(url, "", client)
 		if err != nil {
 			continue
 		}

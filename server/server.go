@@ -23,10 +23,13 @@ const (
 	checkExistenceBeforeSending = false
 )
 
-type ReloadFunc func(cfg *configuration.Config) (string, error)
+type ReloadFunc func(cfg *configuration.Config, client *http.Client) (string, error)
 type SendSIPMessage func(*data.SIPRequest) (*data.SIPResponse, error)
 
-func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo, exporters map[string]exporter.Exporter, updates *data.Updates, refreshRecords ReloadFunc, sendSIPMessage SendSIPMessage, registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template) *Server {
+func NewServer(
+	cfg *configuration.Config, cfgPath string, version *data.Version, records *data.Records, runtimeInfo *data.RuntimeInfo,
+	exporters map[string]exporter.Exporter, updates *data.Updates, refreshRecords ReloadFunc, sendSIPMessage SendSIPMessage,
+	registerCache *data.TTLCache[string, *data.SIPClient], tmpls *template.Template, client *http.Client) *Server {
 	return &Server{
 		Version:        version,
 		Config:         cfg,
@@ -39,6 +42,7 @@ func NewServer(cfg *configuration.Config, cfgPath string, version *data.Version,
 		ReloadFn:       refreshRecords,
 		SendSIPMessage: sendSIPMessage,
 		Tmpls:          tmpls,
+		Client:         client,
 	}
 }
 
@@ -46,6 +50,7 @@ type Server struct {
 	Version    *data.Version
 	Config     *configuration.Config
 	ConfigPath string // optional when using config file
+	Client     *http.Client
 
 	RuntimeInfo   *data.RuntimeInfo
 	Records       *data.Records
@@ -112,11 +117,15 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 		recs[e.DisplayName(pfx)] = e.PhoneNumber
 	}
 
+	updated := "-"
+	if s.Records.Updated.Unix() != 0 {
+		updated = s.Records.Updated.Format(time.RFC3339)
+	}
 	s.Updates.Mu.RLock()
 	defer s.Updates.Mu.RUnlock()
 	data := data.WebIndex{
 		Version:    s.Version,
-		Updated:    s.Records.Updated.Format(time.RFC3339),
+		Updated:    updated,
 		Updates:    s.Updates.Updates,
 		UpdateURLs: strings.Join(s.Config.UpdateURLs, "\n"),
 		Sources:    strings.Join(s.Config.Sources, "\n"),
@@ -509,7 +518,7 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case strings.HasPrefix(src, "/"):
-			if _, err := importer.ReadPhonebook(src, s.Config.Cache); err != nil {
+			if _, err := importer.ReadPhonebook(src, s.Config.Cache, s.Client); err != nil {
 				if s.Config.Debug {
 					fmt.Printf("/updateconfig: specified source are not all readable: %s\n", err)
 				}
@@ -799,12 +808,16 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
+	updated := "-"
+	if s.Records.Updated.Unix() != 0 {
+		updated = s.Records.Updated.Format(time.RFC3339)
+	}
 	data := data.WebReload{
 		Version: s.Version,
-		Updated: s.Records.Updated.Format(time.RFC3339),
+		Updated: updated,
 		Success: true,
 	}
-	if src, err := s.ReloadFn(s.Config); err != nil {
+	if src, err := s.ReloadFn(s.Config, s.Client); err != nil {
 		data.Success = false
 		if s.Config.Debug {
 			fmt.Printf("/reload: unable to reload phonebook: %s\n", err)

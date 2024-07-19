@@ -70,6 +70,7 @@ const (
 	defaultExtension = ".xml"
 	sysInfoReload    = 5 * time.Minute
 	updateInfoReload = 24 * time.Hour
+	httpTimeout      = 5 * time.Second
 )
 
 var (
@@ -135,8 +136,8 @@ func mergePhonebookWithRouting(records []*data.Entry, hostData map[string]*data.
 	return append(records, routableEntries...)
 }
 
-func refreshSysinfo(cfg *configuration.Config) error {
-	si, err := importer.ReadSysInfoFromURL(cfg.SysInfoURL)
+func refreshSysinfo(cfg *configuration.Config, client *http.Client) error {
+	si, err := importer.ReadSysInfoFromURL(cfg.SysInfoURL, client)
 	if err != nil {
 		return fmt.Errorf("error reading sysinfo from %q: %s", cfg.SysInfoURL, err)
 	}
@@ -147,8 +148,8 @@ func refreshSysinfo(cfg *configuration.Config) error {
 	return nil
 }
 
-func refreshUpdates(cfg *configuration.Config) error {
-	u, _ := importer.ReadUpdatesFromURL(cfg.UpdateURLs)
+func refreshUpdates(cfg *configuration.Config, client *http.Client) error {
+	u, _ := importer.ReadUpdatesFromURL(cfg.UpdateURLs, client)
 	if u == nil {
 		return nil // no update available
 	}
@@ -159,15 +160,15 @@ func refreshUpdates(cfg *configuration.Config) error {
 	return nil
 }
 
-func refreshRecords(cfg *configuration.Config) (string, error) {
+func refreshRecords(cfg *configuration.Config, client *http.Client) (string, error) {
 	var updatedFrom string
 	var err error
 	var rec []*data.Entry
 	for _, src := range cfg.Sources {
 		if cfg.Debug {
-			fmt.Printf("Reading phonebook from %q\n", src)
+			fmt.Printf("Read phonebook from %q\n", src)
 		}
-		rec, err = importer.ReadPhonebook(src, cfg.Cache)
+		rec, err = importer.ReadPhonebook(src, cfg.Cache, client)
 		if err == nil {
 			updatedFrom = src
 			break
@@ -175,10 +176,10 @@ func refreshRecords(cfg *configuration.Config) (string, error) {
 	}
 	// File can't be loaded from the network, try to read it from cache.
 	if rec == nil && cfg.Cache != "" {
-		rec, err = importer.ReadPhonebook(cfg.Cache, "")
+		rec, err = importer.ReadPhonebook(cfg.Cache, "", client)
 		if err == nil {
 			if cfg.Debug {
-				fmt.Printf("Reading phonebook from cache: %q\n", cfg.Cache)
+				fmt.Printf("Read phonebook from cache: %q\n", cfg.Cache)
 			}
 			updatedFrom = cfg.Cache
 		}
@@ -193,23 +194,21 @@ func refreshRecords(cfg *configuration.Config) (string, error) {
 	var hostData map[string]*data.OLSR
 	switch {
 	case cfg.OLSRFile == "" && runtimeInfo.SysInfo == nil:
-		fmt.Println("not reading network information: no OLSR file nor sysinfo available")
-		return updatedFrom, nil
+		fmt.Println("not reading network information: neither OLSR file nor sysinfo available")
 
 	case runtimeInfo.SysInfo != nil:
 		hostData, err = olsr.ReadFromSysInfo(runtimeInfo.SysInfo)
 		if err != nil {
-			return updatedFrom, fmt.Errorf("error reading OLSR data from sysinfo: %s", err)
+			fmt.Printf("error reading OLSR data from sysinfo: %s\n", err)
 		}
 
 	case cfg.OLSRFile != "":
 		if _, err := os.Stat(cfg.OLSRFile); err != nil {
 			fmt.Printf("not reading network information: OLSR file %q does not exist\n", cfg.OLSRFile)
-			return updatedFrom, nil
 		}
 		hostData, err = olsr.ReadFromFile(cfg.OLSRFile)
 		if err != nil {
-			return updatedFrom, fmt.Errorf("error reading OLSR data from file %q: %s", cfg.OLSRFile, err)
+			fmt.Printf("error reading OLSR data from file %q: %s", cfg.OLSRFile, err)
 		}
 	}
 
@@ -331,7 +330,7 @@ func getLocalIdentities() (map[string]bool, error) {
 	return identities, nil
 }
 
-func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, ver *data.Version) error {
+func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, client *http.Client, ver *data.Version) error {
 	if cfg.LDAPServer {
 		ldapSrv := &ldap.Server{
 			Config:  cfg,
@@ -382,7 +381,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 	if cfg.SysInfoURL != "" {
 		go func() {
 			for {
-				if err := refreshSysinfo(cfg); err != nil {
+				if err := refreshSysinfo(cfg, client); err != nil {
 					fmt.Printf("error refreshing sysinfo: %s\n", err)
 				}
 				time.Sleep(sysInfoReload)
@@ -392,7 +391,9 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 
 	go func() {
 		for {
-			if _, err := refreshRecords(cfg); err != nil {
+			if updatedFrom, err := refreshRecords(cfg, client); err == nil {
+				fmt.Printf("Updated phonebook records from %q\n", updatedFrom)
+			} else {
 				fmt.Printf("error refreshing phone records: %s\n", err)
 			}
 			time.Sleep(cfg.Reload)
@@ -405,7 +406,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 	if len(cfg.UpdateURLs) > 0 {
 		go func() {
 			for {
-				if err := refreshUpdates(cfg); err != nil {
+				if err := refreshUpdates(cfg, client); err != nil {
 					fmt.Printf("error refreshing updates: %s\n", err)
 				}
 				time.Sleep(updateInfoReload)
@@ -418,7 +419,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 		return err
 	}
 	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
-	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecords, sipSrv.SendSIPMessage, sipSrv.RegisterCache, tmpls)
+	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecords, sipSrv.SendSIPMessage, sipSrv.RegisterCache, tmpls, client)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
 	http.HandleFunc("/", srv.Index)
 	http.HandleFunc("/index.html", srv.Index)
@@ -449,11 +450,13 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, v
 	return http.Serve(listener, nil)
 }
 
-func runLocal(cfg *configuration.Config) error {
-	if err := refreshSysinfo(cfg); err != nil {
+func runLocal(cfg *configuration.Config, client *http.Client) error {
+	if err := refreshSysinfo(cfg, client); err != nil {
 		return err
 	}
-	if _, err := refreshRecords(cfg); err != nil {
+	if updatedFrom, err := refreshRecords(cfg, client); err == nil {
+		fmt.Printf("Updated phonebook records from %q\n", updatedFrom)
+	} else {
 		return err
 	}
 	if err := exportOnce(cfg); err != nil {
@@ -535,11 +538,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	httpClient := &http.Client{
+		Timeout: httpTimeout,
+	}
 	if cfg.Server {
 		if *debug {
 			fmt.Println("Running phonebook in server mode")
 		}
-		if err := runServer(ctx, cfg, *conf, &data.Version{
+		if err := runServer(ctx, cfg, *conf, httpClient, &data.Version{
 			Version:   Version,
 			CommitSHA: CommitSHA,
 		}); err != nil {
@@ -550,7 +556,7 @@ func main() {
 		if *debug {
 			fmt.Println("Running phonebook as a one-time export")
 		}
-		if err := runLocal(cfg); err != nil {
+		if err := runLocal(cfg, httpClient); err != nil {
 			fmt.Printf("unable to run: %s\n", err)
 			os.Exit(1)
 		}

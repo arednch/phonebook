@@ -425,21 +425,19 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, c
 	http.HandleFunc("/index.html", srv.Index)
 	http.HandleFunc("/info", srv.Info)
 	http.HandleFunc("/phonebook", srv.ServePhonebook)
+	http.HandleFunc("/showconfig", srv.ShowConfig)
+	http.HandleFunc("/reload", srv.ReloadPhonebook)
 	if cfg.WebUser != "" && cfg.WebPwd != "" {
 		if cfg.Debug {
 			fmt.Println("protecting most web endpoints with configured basicAuth user/pwd")
 		}
 		http.HandleFunc("/message", srv.BasicAuth(srv.SendMessage))
-		http.HandleFunc("/reload", srv.BasicAuth(srv.ReloadPhonebook))
-		http.HandleFunc("/showconfig", srv.BasicAuth(srv.ShowConfig))
 		http.HandleFunc("/updateconfig", srv.BasicAuth(srv.UpdateConfig))
 	} else {
 		if cfg.Debug {
 			fmt.Println("not protecting any of the web endpoints with basicAuth as not both user/pwd were set")
 		}
 		http.HandleFunc("/message", srv.SendMessage)
-		http.HandleFunc("/reload", srv.ReloadPhonebook)
-		http.HandleFunc("/showconfig", srv.ShowConfig)
 		http.HandleFunc("/updateconfig", srv.UpdateConfig)
 	}
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))

@@ -48,8 +48,9 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 	}
 	defer conn.Close()
 
+	var buf = make([]byte, maxPacketSize)
+	var data []byte
 	for {
-		buf := make([]byte, maxPacketSize)
 		n, addr, err := conn.ReadFrom(buf)
 		if err != nil && s.Config.Debug {
 			fmt.Printf("SIP: error reading (%d bytes) from conn: %s", n, err)
@@ -58,7 +59,9 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 		if n == 0 {
 			continue
 		}
-		go s.handlePacket(conn, addr, buf[:n])
+		data = make([]byte, n)
+		copy(data, buf[:n])
+		go s.handlePacket(conn, addr, data)
 	}
 }
 

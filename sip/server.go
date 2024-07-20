@@ -1,6 +1,7 @@
 package sip
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -19,7 +20,7 @@ const (
 	// UDP Port where phones are expected to listen on.
 	expectedPhoneSIPPort = 5060
 
-	maxPacketSize = 1024
+	maxPacketSize = 1500
 )
 
 var (
@@ -41,15 +42,15 @@ type Server struct {
 }
 
 func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
-	pc, err := net.ListenPacket(proto, addr)
+	conn, err := net.ListenPacket(proto, addr)
 	if err != nil {
 		return fmt.Errorf("SIP: unable to listen: %s", err)
 	}
-	defer pc.Close()
+	defer conn.Close()
 
 	for {
 		buf := make([]byte, maxPacketSize)
-		n, addr, err := pc.ReadFrom(buf)
+		n, addr, err := conn.ReadFrom(buf)
 		if err != nil && s.Config.Debug {
 			fmt.Printf("SIP: error reading (%d bytes) from conn: %s", n, err)
 			continue
@@ -57,11 +58,18 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 		if n == 0 {
 			continue
 		}
-		go s.handlePacket(pc, addr, buf[:n])
+		go s.handlePacket(conn, addr, buf[:n])
 	}
 }
 
-func (s *Server) handlePacket(pc net.PacketConn, addr net.Addr, buf []byte) {
+func (s *Server) handlePacket(conn net.PacketConn, addr net.Addr, buf []byte) {
+	if len(buf) <= 4 {
+		if len(bytes.Trim(buf, "\r\n")) == 0 {
+			fmt.Printf("SIP/Request (%d bytes): Received keep alive CRLF\n", len(buf))
+			return
+		}
+	}
+
 	if s.Config.Debug {
 		fmt.Printf("SIP/Request (%d bytes):\n%s\n", len(buf), string(buf))
 	}
@@ -82,7 +90,7 @@ func (s *Server) handlePacket(pc net.PacketConn, addr net.Addr, buf []byte) {
 	if s.Config.Debug {
 		fmt.Printf("SIP/Response (%d bytes):\n%s\n", (len(out)), string(out))
 	}
-	if _, err := pc.WriteTo(out, addr); s.Config.Debug && err != nil {
+	if _, err := conn.WriteTo(out, addr); s.Config.Debug && err != nil {
 		fmt.Printf("SIP/Response: unable to write: %s", err)
 	}
 }

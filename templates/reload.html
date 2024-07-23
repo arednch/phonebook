@@ -1,38 +1,4 @@
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>Phonebook: Reload</title>
-    <link href="http://localnode.local.mesh/bootstrap.min.css" rel="stylesheet">
-	</head>
-
-  <body>
-
-		<div class="container">
-      <div class="row">
-        <div class="col">
-          <h1><a href="/" class="link-underline link-underline-opacity-10">Reload</a></h1>
-        </div>
-      </div>
-      <div class="alert alert-secondary">
-        <div class="row">
-          <div class="col">
-            Version: {{ .Version.Version }}
-          </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            Commit hash:
-            {{ if eq .Version.CommitSHA "-" }}
-              not comitted/pushed yet (dev version)
-            {{ else }}
-              "<a href="https://github.com/arednch/phonebook/tree/{{ .Version.CommitSHA }}">{{ .Version.CommitSHA }}</a>"
-            {{ end }}
-          </div>
-        </div>
-      </div>
-
+{{ template "header.html" . }}
       {{ if .Success }}
         <div class="alert alert-success">
           <div class="row">
@@ -50,6 +16,4 @@
           </div>
         </div>
       {{ end }}
-
-  </body>
-</html>
+{{ template "footer.html" . }}

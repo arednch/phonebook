@@ -87,6 +87,26 @@ func (s *Server) BasicAuth(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+func (s *Server) prepareDefaultData(title string, includeUpdates bool) *data.WebDefault {
+	updated := "-"
+	if s.Records.Updated.Unix() != 0 {
+		updated = s.Records.Updated.Format(time.RFC3339)
+	}
+
+	var updates []*data.Update
+	if includeUpdates {
+		s.Updates.Mu.RLock()
+		defer s.Updates.Mu.RUnlock()
+		updates = s.Updates.Updates
+	}
+	return &data.WebDefault{
+		Title:   title,
+		Version: s.Version,
+		Updated: updated,
+		Updates: updates,
+	}
+}
+
 func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	var exp []string
 	for k := range s.Exporters {
@@ -117,16 +137,8 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 		recs[e.DisplayName(pfx)] = e.PhoneNumber
 	}
 
-	updated := "-"
-	if s.Records.Updated.Unix() != 0 {
-		updated = s.Records.Updated.Format(time.RFC3339)
-	}
-	s.Updates.Mu.RLock()
-	defer s.Updates.Mu.RUnlock()
 	data := data.WebIndex{
-		Version:    s.Version,
-		Updated:    updated,
-		Updates:    s.Updates.Updates,
+		WebDefault: *s.prepareDefaultData("Overview", true),
 		UpdateURLs: strings.Join(s.Config.UpdateURLs, "\n"),
 		Sources:    strings.Join(s.Config.Sources, "\n"),
 		Records:    recs,
@@ -142,7 +154,7 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 	s.Records.Mu.RLock()
 	defer s.Records.Mu.RUnlock()
 	info := &data.WebInfo{
-		Version: s.Version,
+		WebDefault: *s.prepareDefaultData("Info", false),
 		RecordStats: data.RecordStats{
 			Count:   len(s.Records.Entries),
 			Updated: s.Records.Updated,
@@ -187,8 +199,8 @@ func (s *Server) Info(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 	d := data.WebMessage{
-		Version: s.Version,
-		Success: true,
+		WebDefault: *s.prepareDefaultData("Send Message", false),
+		Success:    true,
 	}
 
 	from := r.FormValue("from")
@@ -326,8 +338,8 @@ func (s *Server) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 	data := data.WebShowConfig{
-		Version: s.Version,
-		Success: true,
+		WebDefault: *s.prepareDefaultData("Show Config", false),
+		Success:    true,
 	}
 
 	t := r.FormValue("type")
@@ -424,8 +436,8 @@ func (s *Server) ShowConfig(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	data := data.WebUpdateConfig{
-		Version: s.Version,
-		Success: true,
+		WebDefault: *s.prepareDefaultData("Update Config", false),
+		Success:    true,
 	}
 
 	if !s.Config.AllowRuntimeConfigChanges {
@@ -808,14 +820,9 @@ func (s *Server) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ReloadPhonebook(w http.ResponseWriter, r *http.Request) {
-	updated := "-"
-	if s.Records.Updated.Unix() != 0 {
-		updated = s.Records.Updated.Format(time.RFC3339)
-	}
 	data := data.WebReload{
-		Version: s.Version,
-		Updated: updated,
-		Success: true,
+		WebDefault: *s.prepareDefaultData("Reload", false),
+		Success:    true,
 	}
 	if src, err := s.ReloadFn(s.Config, s.Client); err != nil {
 		data.Success = false

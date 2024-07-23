@@ -2,8 +2,15 @@ package data
 
 import "time"
 
+type WebDefault struct {
+	Title   string
+	Version *Version `json:"version"`
+	Updated string
+	Updates []*Update
+}
+
 type WebInfo struct {
-	Version     *Version          `json:"version"`
+	WebDefault
 	Registered  map[string]string `json:"registered_phones,omitempty"`
 	RecordStats RecordStats       `json:"records_stats,omitempty"`
 	Runtime     Runtime           `json:"runtime,omitempty"`
@@ -22,19 +29,17 @@ type RecordStats struct {
 }
 
 type WebIndex struct {
-	Version *Version
-	Updated string
+	WebDefault
 
 	Registered map[string]string
 	Records    map[string]string
-	Updates    []*Update
 	UpdateURLs string
 	Sources    string
 	Exporters  []string
 }
 
 type WebMessage struct {
-	Version *Version
+	WebDefault
 
 	Success bool
 	From    string
@@ -43,15 +48,14 @@ type WebMessage struct {
 }
 
 type WebReload struct {
-	Version *Version
-	Updated string
+	WebDefault
 
 	Source  string
 	Success bool
 }
 
 type WebShowConfig struct {
-	Version *Version
+	WebDefault
 
 	Messages []string
 	Content  string
@@ -60,7 +64,7 @@ type WebShowConfig struct {
 }
 
 type WebUpdateConfig struct {
-	Version *Version
+	WebDefault
 
 	Messages []string
 	Success  bool

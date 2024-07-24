@@ -396,6 +396,11 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, c
 			} else {
 				fmt.Printf("error refreshing phone records: %s\n", err)
 			}
+			if cfg.Path != "" {
+				if err := exportOnce(cfg); err != nil {
+					fmt.Printf("error exporting phonebook: %s\n", err)
+				}
+			}
 			time.Sleep(cfg.Reload)
 		}
 	}()

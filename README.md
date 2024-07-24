@@ -24,7 +24,9 @@ Generally applicable:
 - `active_pfx`: Prefix to add when -indicate_active is set. Default: `*`
 - `indicate_active`: Prefixes active participants in the phonebook with `active_pfx`. Default: `false`
 
-Only relevant when running in **non-server / ad-hoc mode**:
+Primarily relevant when running in **non-server / ad-hoc mode**:
+
+Note: These settings can also be used in server mode which means the output files will be produced as well.
 
 - `path`: Folder to write the phonebooks to locally. Default: ""
 - `formats`: Comma separated list of formats to export.
@@ -143,39 +145,45 @@ A typical file would look like this:
 
 ```
 {
-	"sources": [
-		"http://aredn-node-1.local.mesh:8081/phonebook.csv",
-		"http://aredn-node-2.local.mesh:8081/phonebook.csv"
-	],
+  "sources": [
+		"http://aredn-node-1.local.mesh/phonebook.csv",
+		"http://aredn-node-2.local.mesh/phonebook.csv"
+  ],
+  "update_urls": [
+		"http://aredn-node-1.local.mesh/updates.json",
+		"http://aredn-node-2.local.mesh/updates.json"
+  ],
 	"olsr_file": "/tmp/run/hosts_olsr",
 	"sysinfo_url": "http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1",
-	"ldap_server": true,
-	"sip_server": true,
-	"debug": false,
-  "allow_config_changes": false,
-	"allow_permanent_config_changes", false,
+  "ldap_server": true,
+  "sip_server": true,
+  "debug": true,
+	"allow_runtime_config_changes": true,
+	"allow_permanent_config_changes": false,
+  "country_prefix": "041",
 	"path": "/www/arednstack",
-	"formats": [
-		"combined",
-		"direct",
-		"pbx"
-	],
-	"targets": [
-		"generic"
-	],
-	"resolve": false,
-	"indicate_active": true,
-	"filter_inactive": false,
-	"active_pfx": "*",
-	"include_routable": true,
-	"port": 8081,
-	"reload_seconds": 3600,
+  "formats": [
+    "combined",
+    "direct",
+    "pbx"
+  ],
+  "targets": [
+    "generic"
+  ],
+  "resolve": false,
+  "indicate_active": true,
+  "filter_inactive": false,
+  "active_pfx": "*",
+  "include_routable": true,
+  "port": 8081,
+  "cache": "/www/arednstack/phonebook.csv",
+  "reload_seconds": 3600,
 	"web_user": "aredn",
 	"web_pwd": "notasecret",
-	"ldap_port": 3890,
-	"ldap_user": "aredn",
-	"ldap_pwd": "aredn",
-	"sip_port": 5060
+  "ldap_port": 3890,
+  "ldap_user": "aredn",
+  "ldap_pwd": "aredn",
+  "sip_port": 5060
 }
 ```
 

@@ -160,6 +160,23 @@ func refreshUpdates(cfg *configuration.Config, client *http.Client) error {
 	return nil
 }
 
+func refreshRecordsAndExport(cfg *configuration.Config, client *http.Client) (string, error) {
+	updatedFrom, err := refreshRecords(cfg, client)
+	if err != nil {
+		return "", fmt.Errorf("unable to refresh records: %s", err)
+	}
+	if cfg.Path == "" {
+		if cfg.Debug {
+			fmt.Printf("not exported phonebook because path is not set")
+		}
+		return updatedFrom, nil
+	}
+	if err := exportOnce(cfg); err != nil {
+		return updatedFrom, fmt.Errorf("unable to export: %s", err)
+	}
+	return updatedFrom, nil
+}
+
 func refreshRecords(cfg *configuration.Config, client *http.Client) (string, error) {
 	var updatedFrom string
 	var err error
@@ -391,15 +408,10 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, c
 
 	go func() {
 		for {
-			if updatedFrom, err := refreshRecords(cfg, client); err == nil {
+			if updatedFrom, err := refreshRecordsAndExport(cfg, client); err == nil {
 				fmt.Printf("Updated phonebook records from %q\n", updatedFrom)
 			} else {
-				fmt.Printf("error refreshing phone records: %s\n", err)
-			}
-			if cfg.Path != "" {
-				if err := exportOnce(cfg); err != nil {
-					fmt.Printf("error exporting phonebook: %s\n", err)
-				}
+				fmt.Printf("error refreshing and exporting phone records: %s\n", err)
 			}
 			time.Sleep(cfg.Reload)
 		}
@@ -424,7 +436,7 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, c
 		return err
 	}
 	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
-	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecords, sipSrv.SendSIPMessage, sipSrv.RegisterCache, tmpls, client)
+	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecordsAndExport, sipSrv.SendSIPMessage, sipSrv.RegisterCache, tmpls, client)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
 	http.HandleFunc("/", srv.Index)
 	http.HandleFunc("/index.html", srv.Index)

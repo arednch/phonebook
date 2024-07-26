@@ -68,7 +68,9 @@ func (s *Server) ListenAndServe(ctx context.Context, proto, addr string) error {
 func (s *Server) handlePacket(conn net.PacketConn, addr net.Addr, buf []byte) {
 	if len(buf) <= 4 {
 		if len(bytes.Trim(buf, "\r\n")) == 0 {
-			fmt.Printf("SIP/Request (%d bytes): Received keep alive CRLF\n", len(buf))
+			if s.Config.Debug {
+				fmt.Printf("SIP/Request (%d bytes): Received keep alive CRLF\n", len(buf))
+			}
 			return
 		}
 	}

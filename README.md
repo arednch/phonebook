@@ -69,13 +69,13 @@ Only relevant when running in **server mode** AND **SIP server** is active:
 
 Read CSV from a local file and write the XML files in the `/www` folder for Yealink phones:
 
-```
+```bash
 go run phonebook.go -source='AREDN_Phonebook.csv' -targets='yealink' -formats='direct' -path=/www/
 ```
 
 Read the CSV from a URL and write the XML files in the `/tmp` folder for Yealink and Cisco phones:
 
-```
+```bash
 go run phonebook.go -source='http://aredn-node.local.mesh:8081/phonebook.csv' -targets='yealink,cisco' -formats='direct,pbx' -path=/tmp/
 ```
 
@@ -110,7 +110,8 @@ WantedBy=multi-user.target
 ```
 
 The following reloads the services, starts it, enables it to run after reboots and gets its status:
-```
+
+```bash
 sudo systemctl daemon-reload
 sudo systemctl start phonebook.service
 sudo systemctl enable phonebook.service
@@ -119,7 +120,7 @@ systemctl status phonebook.service
 
 You could also simplify later re-deployments a bit:
 
-```
+```bash
 #!/bin/sh
 
 cd /tmp/
@@ -137,13 +138,13 @@ systemctl status phonebook.service
 
 Optionally, instead of passing flags, the config values can be read from a JSON config file too:
 
-```
+```bash
 go run . -conf="/etc/phonebook.conf" -server
 ```
 
 A typical file would look like this:
 
-```
+```json
 {
   "sources": [
 		"http://aredn-node-1.local.mesh/phonebook.csv",
@@ -366,7 +367,7 @@ Optional parameters:
 | Target    | ath79                | ipq40xx           | ath79                       |
 | Arch      | MIPS                 | ARM Cortex        | MIPS                        |
 | RAM       | 64MB                 | 256MB             | 128MB                       |
-| Phonebook | 🟢                   | 🟢                | 🟢                           |
+| Phonebook | 🟡                   | 🟢                | 🟢                           |
 
 Note: Some devices do not have a lot of space (e.g. hAP Lite). If you run into problems:
 

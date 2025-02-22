@@ -35,6 +35,7 @@ type Config struct {
 	Server          bool     `json:"server,omitempty"`
 	LDAPServer      bool     `json:"ldap_server"`
 	SIPServer       bool     `json:"sip_server"`
+	WebServer       bool     `json:"web_server"`
 	IncludeRoutable bool     `json:"include_routable"`
 	CountryPrefix   string   `json:"country_prefix"`
 

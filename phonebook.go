@@ -38,6 +38,7 @@ var (
 	daemonize       = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 	ldapServer      = flag.Bool("ldap_server", false, "Phonebook also runs an LDAP server when in server mode.")
 	sipServer       = flag.Bool("sip_server", false, "Phonebook also runs a SIP server when in server mode.")
+	webServer       = flag.Bool("web_server", true, "Phonebook runs a webserver when in server mode.")
 	debug           = flag.Bool("debug", false, "Turns on verbose logging to stdout when set to true.")
 	allowRtCfgChg   = flag.Bool("allow_runtime_config_changes", false, "Allows runtime config changes via web server when set to true.")
 	allowPermCfgChg = flag.Bool("allow_permanent_config_changes", false, "Allows permanent config changes via web server when set to true.")
@@ -431,38 +432,45 @@ func runServer(ctx context.Context, cfg *configuration.Config, cfgPath string, c
 		}()
 	}
 
-	resFS, err := fs.Sub(webFS, "resources")
-	if err != nil {
-		return err
-	}
-	tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
-	srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecordsAndExport, sipSrv.SendSIPMessage, sipSrv.RegisterCache, tmpls, client)
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
-	http.HandleFunc("/", srv.Index)
-	http.HandleFunc("/index.html", srv.Index)
-	http.HandleFunc("/info", srv.Info)
-	http.HandleFunc("/phonebook", srv.ServePhonebook)
-	http.HandleFunc("/showconfig", srv.ShowConfig)
-	http.HandleFunc("/reload", srv.ReloadPhonebook)
-	if cfg.WebUser != "" && cfg.WebPwd != "" {
-		if cfg.Debug {
-			fmt.Println("protecting most web endpoints with configured basicAuth user/pwd")
+	if cfg.WebServer {
+		resFS, err := fs.Sub(webFS, "resources")
+		if err != nil {
+			return err
 		}
-		http.HandleFunc("/message", srv.BasicAuth(srv.SendMessage))
-		http.HandleFunc("/updateconfig", srv.BasicAuth(srv.UpdateConfig))
-	} else {
-		if cfg.Debug {
-			fmt.Println("not protecting any of the web endpoints with basicAuth as not both user/pwd were set")
+		tmpls := template.Must(template.ParseFS(webFS, "templates/*.html"))
+		srv := server.NewServer(cfg, cfgPath, ver, records, runtimeInfo, exporters, updates, refreshRecordsAndExport, sipSrv.SendSIPMessage, sipSrv.RegisterCache, tmpls, client)
+		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(resFS))))
+		http.HandleFunc("/", srv.Index)
+		http.HandleFunc("/index.html", srv.Index)
+		http.HandleFunc("/info", srv.Info)
+		http.HandleFunc("/phonebook", srv.ServePhonebook)
+		http.HandleFunc("/showconfig", srv.ShowConfig)
+		http.HandleFunc("/reload", srv.ReloadPhonebook)
+		if cfg.WebUser != "" && cfg.WebPwd != "" {
+			if cfg.Debug {
+				fmt.Println("protecting most web endpoints with configured basicAuth user/pwd")
+			}
+			http.HandleFunc("/message", srv.BasicAuth(srv.SendMessage))
+			http.HandleFunc("/updateconfig", srv.BasicAuth(srv.UpdateConfig))
+		} else {
+			if cfg.Debug {
+				fmt.Println("not protecting any of the web endpoints with basicAuth as not both user/pwd were set")
+			}
+			http.HandleFunc("/message", srv.SendMessage)
+			http.HandleFunc("/updateconfig", srv.UpdateConfig)
 		}
-		http.HandleFunc("/message", srv.SendMessage)
-		http.HandleFunc("/updateconfig", srv.UpdateConfig)
-	}
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
-	if err != nil {
-		return err
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
+		if err != nil {
+			return err
+		}
+
+		return http.Serve(listener, nil)
 	}
 
-	return http.Serve(listener, nil)
+	for {
+		fmt.Println("phonebook running")
+		time.Sleep(time.Hour)
+	}
 }
 
 func runLocal(cfg *configuration.Config, client *http.Client) error {
@@ -519,6 +527,7 @@ func main() {
 			Server:                      *daemonize,
 			LDAPServer:                  *ldapServer,
 			SIPServer:                   *sipServer,
+			WebServer:                   *webServer,
 			Debug:                       *debug,
 			AllowRuntimeConfigChanges:   *allowRtCfgChg,
 			AllowPermanentConfigChanges: *allowPermCfgChg,

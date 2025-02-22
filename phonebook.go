@@ -71,7 +71,7 @@ const (
 	defaultExtension = ".xml"
 	sysInfoReload    = 5 * time.Minute
 	updateInfoReload = 24 * time.Hour
-	httpTimeout      = 5 * time.Second
+	httpTimeout      = 10 * time.Second
 )
 
 var (

@@ -65,7 +65,7 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 	// Populate a (sorted) list of results for the given search query.
 	entries := []*ldapserver.Entry{}
 	for _, entry := range s.Records.Entries {
-		if s.Config.FilterInactive && entry.OLSR == nil {
+		if s.Config.FilterInactive && entry.Route == nil {
 			if s.Config.Debug {
 				fmt.Printf("LDAP/Search: Filtering inactive entry: %+v\n", entry)
 			}
@@ -73,7 +73,7 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 		}
 
 		var pfx string
-		if s.Config.IndicateActive && entry.OLSR != nil {
+		if s.Config.IndicateActive && entry.Route != nil {
 			pfx = s.Config.ActivePfx
 		}
 		name := entry.DisplayName(pfx)
@@ -93,16 +93,16 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 		for _, frmt := range s.Config.Formats {
 			switch frmt {
 			case "direct":
-				if s.Config.Resolve && entry.OLSR != nil {
-					telAttrs[entry.OLSR.IP] = true
+				if s.Config.Resolve && entry.Route != nil {
+					telAttrs[entry.Route.IP] = true
 				} else {
 					telAttrs[entry.DirectCallAddress()] = true
 				}
 			case "pbx":
 				telAttrs[entry.PhoneNumber] = true
 			default:
-				if s.Config.Resolve && entry.OLSR != nil {
-					telAttrs[entry.OLSR.IP] = true
+				if s.Config.Resolve && entry.Route != nil {
+					telAttrs[entry.Route.IP] = true
 					telAttrs[entry.PhoneNumber] = true
 				} else {
 					telAttrs[entry.DirectCallAddress()] = true
@@ -126,8 +126,8 @@ func (s *Server) Search(boundDN string, searchReq ldapserver.SearchRequest, conn
 			{Name: "telephoneNumber", Values: []string{entry.PhoneNumber}},
 			{Name: "telephoneHostname", Values: []string{entry.DirectCallAddress()}},
 		}
-		if entry.OLSR != nil {
-			attrs = append(attrs, &ldapserver.EntryAttribute{Name: "telephoneIP", Values: []string{entry.OLSR.IP}})
+		if entry.Route != nil {
+			attrs = append(attrs, &ldapserver.EntryAttribute{Name: "telephoneIP", Values: []string{entry.Route.IP}})
 		}
 
 		// Populate Linphone default as a single address.

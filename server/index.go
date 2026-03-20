@@ -32,7 +32,7 @@ func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	recs := make(map[string]string)
 	for _, e := range s.Records.Entries {
 		var pfx string
-		if s.Config.IndicateActive && e.OLSR != nil {
+		if s.Config.IndicateActive && e.Route != nil {
 			pfx = s.Config.ActivePfx
 		}
 		recs[e.DisplayName(pfx)] = e.PhoneNumber

@@ -30,7 +30,6 @@ const (
 type Config struct {
 	// Generally applicable.
 	Sources         []string `json:"sources"`
-	OLSRFile        string   `json:"olsr_file"`
 	SysInfoURL      string   `json:"sysinfo_url"`
 	Server          bool     `json:"server,omitempty"`
 	LDAPServer      bool     `json:"ldap_server"`

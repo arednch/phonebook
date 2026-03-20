@@ -4,15 +4,15 @@ import (
 	"strings"
 )
 
-type OLSR struct {
+type RouteEntry struct {
 	IP       string
 	Hostname string
 }
 
-func NewEntryFromOLSR(o *OLSR) *Entry {
+func NewEntryFromRoute(o *RouteEntry) *Entry {
 	pn := strings.Split(o.Hostname, ".")[0]
 	return &Entry{
 		PhoneNumber: pn,
-		OLSR:        o,
+		Route:       o,
 	}
 }

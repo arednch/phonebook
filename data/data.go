@@ -16,7 +16,7 @@ const (
 type ByName []*Entry
 
 func (e ByName) sortKeyForEntry(entry *Entry) string {
-	if entry.OLSR != nil {
+	if entry.Route != nil {
 		// Mark active entries so they appear first.
 		return fmt.Sprintf("*%s %s %s", entry.LastName, entry.FirstName, entry.Callsign)
 	}
@@ -52,7 +52,7 @@ type Entry struct {
 	PhoneNumber string
 
 	// Metadata
-	OLSR *OLSR // if present, the participant seems to be active
+	Route *RouteEntry // if present, the participant seems to be active
 }
 
 func (e *Entry) DisplayName(pfx string) string {

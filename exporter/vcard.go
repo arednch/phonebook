@@ -18,7 +18,7 @@ func (v *VCard) Export(entries []*data.Entry, format Format, activePfx string, r
 	enc := vcard.NewEncoder(out)
 
 	for _, entry := range entries {
-		if filterInactive && entry.OLSR == nil {
+		if filterInactive && entry.Route == nil {
 			if debug {
 				fmt.Printf("Export/vCard: Filtering inactive entry %+v\n", entry)
 			}

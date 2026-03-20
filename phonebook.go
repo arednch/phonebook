@@ -24,7 +24,7 @@ import (
 	"github.com/arednch/phonebook/exporter"
 	"github.com/arednch/phonebook/importer"
 	"github.com/arednch/phonebook/ldap"
-	"github.com/arednch/phonebook/olsr"
+	"github.com/arednch/phonebook/route"
 	"github.com/arednch/phonebook/server"
 	"github.com/arednch/phonebook/sip"
 )
@@ -33,7 +33,6 @@ var (
 	// Generally applicable flags.
 	conf            = flag.String("conf", "", "Path to the JSON config file instead of parsing flags.")
 	sources         = flag.String("sources", "", "Comma separated paths or URLs to fetch the phonebook CSV from.")
-	olsrFile        = flag.String("olsr", "/tmp/run/hosts_olsr", "Path to the OLSR hosts file.")
 	sysInfoURL      = flag.String("sysinfo", "", "URL of sysinfo JSON API. Usually: http://localnode.local.mesh/cgi-bin/sysinfo.json?hosts=1")
 	daemonize       = flag.Bool("server", false, "Phonebook acts as a server when set to true.")
 	ldapServer      = flag.Bool("ldap_server", false, "Phonebook also runs an LDAP server when in server mode.")
@@ -97,14 +96,14 @@ var (
 	webFS embed.FS
 )
 
-func mergePhonebookWithRouting(records []*data.Entry, hostData map[string]*data.OLSR, cfg *configuration.Config) []*data.Entry {
+func mergePhonebookWithRouting(records []*data.Entry, hostData map[string]*data.RouteEntry, cfg *configuration.Config) []*data.Entry {
 	addedOLSR := make(map[string]bool)
 	// First find all phonebook entries with an OLSR entry.
 	for _, e := range records {
 		hostname := strings.Split(e.PhoneNumber, ".")[0]
 		o, ok := hostData[hostname]
 		if ok {
-			e.OLSR = o
+			e.Route = o
 			addedOLSR[hostname] = true
 			continue
 		}
@@ -128,7 +127,7 @@ func mergePhonebookWithRouting(records []*data.Entry, hostData map[string]*data.
 		if cfg.Debug {
 			fmt.Printf("  - adding routable entry %s (%s)\n", o.Hostname, o.IP)
 		}
-		routableEntries = append(routableEntries, data.NewEntryFromOLSR(o))
+		routableEntries = append(routableEntries, data.NewEntryFromRoute(o))
 	}
 	if cfg.Debug {
 		fmt.Printf("Merged added another %d routable entries.\n", len(routableEntries))
@@ -209,24 +208,15 @@ func refreshRecords(cfg *configuration.Config, client *http.Client) (string, err
 
 	runtimeInfo.Mu.Lock()
 	defer runtimeInfo.Mu.Unlock()
-	var hostData map[string]*data.OLSR
+	var hostData map[string]*data.RouteEntry
 	switch {
-	case cfg.OLSRFile == "" && runtimeInfo.SysInfo == nil:
-		fmt.Println("not reading network information: neither OLSR file nor sysinfo available")
+	case runtimeInfo.SysInfo == nil:
+		fmt.Println("not reading network information: sysinfo not available")
 
 	case runtimeInfo.SysInfo != nil:
-		hostData, err = olsr.ReadFromSysInfo(runtimeInfo.SysInfo)
+		hostData, err = route.ReadFromSysInfo(runtimeInfo.SysInfo)
 		if err != nil {
 			fmt.Printf("error reading OLSR data from sysinfo: %s\n", err)
-		}
-
-	case cfg.OLSRFile != "":
-		if _, err := os.Stat(cfg.OLSRFile); err != nil {
-			fmt.Printf("not reading network information: OLSR file %q does not exist\n", cfg.OLSRFile)
-		}
-		hostData, err = olsr.ReadFromFile(cfg.OLSRFile)
-		if err != nil {
-			fmt.Printf("error reading OLSR data from file %q: %s", cfg.OLSRFile, err)
 		}
 	}
 
@@ -522,7 +512,6 @@ func main() {
 	} else {
 		cfg = &configuration.Config{
 			Sources:                     strings.Split(*sources, ","),
-			OLSRFile:                    *olsrFile,
 			SysInfoURL:                  *sysInfoURL,
 			Server:                      *daemonize,
 			LDAPServer:                  *ldapServer,

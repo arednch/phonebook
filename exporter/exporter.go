@@ -16,7 +16,7 @@ const (
 
 func NameForEntry(entry *data.Entry, indicateActive bool, activePfx string) string {
 	var pfx string
-	if indicateActive && entry.OLSR != nil {
+	if indicateActive && entry.Route != nil {
 		pfx = activePfx
 	}
 	switch {
@@ -38,17 +38,17 @@ func NameForEntry(entry *data.Entry, indicateActive bool, activePfx string) stri
 func TelefoneForEntry(entry *data.Entry, resolve bool, format Format) []string {
 	switch format {
 	case "direct":
-		if resolve && entry.OLSR != nil {
-			return []string{entry.OLSR.IP}
+		if resolve && entry.Route != nil {
+			return []string{entry.Route.IP}
 		} else {
 			return []string{entry.DirectCallAddress()}
 		}
 	case "pbx":
 		return []string{entry.PhoneNumber}
 	default:
-		if resolve && entry.OLSR != nil {
+		if resolve && entry.Route != nil {
 			return []string{
-				entry.OLSR.IP,
+				entry.Route.IP,
 				entry.PhoneNumber,
 			}
 		} else {
@@ -69,7 +69,7 @@ type Exporter interface {
 func export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) *data.GenericPhoneBook {
 	var targetEntries []*data.GenericEntry
 	for _, entry := range entries {
-		if filterInactive && entry.OLSR == nil {
+		if filterInactive && entry.Route == nil {
 			if debug {
 				fmt.Printf("Export/Generic: Filtering inactive entry: %+v\n", entry)
 			}

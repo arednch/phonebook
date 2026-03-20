@@ -188,8 +188,8 @@ func (s *Server) handleInvite(req *data.SIPRequest) (*data.SIPResponse, error) {
 		}
 
 		host := entry.PhoneFQDN()
-		if s.Config.Resolve && entry.OLSR != nil {
-			host = entry.OLSR.IP
+		if s.Config.Resolve && entry.Route != nil {
+			host = entry.Route.IP
 		}
 
 		// We found an entry in the phonebook to redirect to.

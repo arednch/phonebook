@@ -33,7 +33,7 @@ type Grandstream struct{}
 func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx string, resolve, indicateActive, filterInactive, debug bool) ([]byte, error) {
 	var targetEntries []*GrandstreamEntry
 	for _, entry := range entries {
-		if filterInactive && entry.OLSR == nil {
+		if filterInactive && entry.Route == nil {
 			if debug {
 				fmt.Printf("Export/Grandstream: Filtering inactive entry %+v\n", entry)
 			}
@@ -41,7 +41,7 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 		}
 
 		var pfx string
-		if indicateActive && entry.OLSR != nil {
+		if indicateActive && entry.Route != nil {
 			pfx = activePfx
 		}
 		var firstname, lastname string
@@ -66,10 +66,10 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 		var tel []*GrandstreamPhone
 		switch format {
 		case "direct":
-			if resolve && entry.OLSR != nil {
+			if resolve && entry.Route != nil {
 				tel = []*GrandstreamPhone{{
 					AccountIndex: GrandstreamDefaultIPCallAccountIdx,
-					PhoneNumber:  entry.OLSR.IP,
+					PhoneNumber:  entry.Route.IP,
 				}}
 			} else {
 				tel = []*GrandstreamPhone{{
@@ -83,11 +83,11 @@ func (g *Grandstream) Export(entries []*data.Entry, format Format, activePfx str
 				PhoneNumber:  entry.PhoneNumber,
 			}}
 		default:
-			if resolve && entry.OLSR != nil {
+			if resolve && entry.Route != nil {
 				tel = []*GrandstreamPhone{
 					{
 						AccountIndex: GrandstreamDefaultIPCallAccountIdx,
-						PhoneNumber:  entry.OLSR.IP,
+						PhoneNumber:  entry.Route.IP,
 					}, {
 						AccountIndex: GrandstreamDefaultPBXAccountIdx,
 						PhoneNumber:  entry.PhoneNumber,

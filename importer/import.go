@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	headerFirstName   = "first_name"
+	headerFirstName   = "Firstname"
 	headerLastName    = "name"
 	headerCallsign    = "callsign"
 	headerPhoneNumber = "telephone"
-	headerPrivate     = "privat"
+	headerPrivate     = "Privat"
 )
 
 func ReadFromURL(url string, cache string, client *http.Client) ([]byte, error) {

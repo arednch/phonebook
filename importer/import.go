@@ -79,19 +79,19 @@ func ReadPhonebook(path string, cache string, client *http.Client) ([]*data.Entr
 	}
 	firstIdx, ok := headers[headerFirstName]
 	if !ok {
-		return nil, errors.New("unable to locate first name column in CSV")
+		return nil, fmt.Errorf("unable to locate first name column in CSV: %s", headerFirstName)
 	}
 	lastIdx, ok := headers[headerLastName]
 	if !ok {
-		return nil, errors.New("unable to locate last name column in CSV")
+		return nil, fmt.Errorf("unable to locate last name column in CSV: %s", headerLastName)
 	}
 	callIdx, ok := headers[headerCallsign]
 	if !ok {
-		return nil, errors.New("unable to locate callsign column in CSV")
+		return nil, fmt.Errorf("unable to locate callsign column in CSV: %s", headerCallsign)
 	}
 	phoneIdx, ok := headers[headerPhoneNumber]
 	if !ok {
-		return nil, errors.New("unable to locate phone number column in CSV")
+		return nil, fmt.Errorf("unable to locate phone number column in CSV: %s", headerPhoneNumber)
 	}
 	privateIdx, privateIdxAvailable := headers[headerPrivate]
 

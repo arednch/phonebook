@@ -37,7 +37,8 @@ type Host struct {
 
 type NodeDetails struct {
 	Model           string `json:"model"`
-	MeshGateway     string `json:"mesh_gateway"`
+	MeshGateway     bool   `json:"mesh_gateway"`
+	MeshSupernode   bool   `json:"mesh_supernode"`
 	BoardID         string `json:"board_id"`
 	FirmwareMfg     string `json:"firmware_mfg"`
 	FirmwareVersion string `json:"firmware_version"`

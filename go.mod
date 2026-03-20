@@ -1,6 +1,6 @@
 module github.com/arednch/phonebook
 
-go 1.25.7
+go 1.23.12
 
 require (
 	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff

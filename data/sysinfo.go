@@ -19,8 +19,6 @@ type SysInfo struct {
 	NodeDetails *NodeDetails `json:"node_details"`
 	System      *System      `json:"sysinfo"`
 
-	Longitude  string `json:"lon"`
-	Latitude   string `json:"lat"`
 	Gridsquare string `json:"grid_square"`
 
 	Hosts []*Host `json:"hosts"`
@@ -37,8 +35,6 @@ type Host struct {
 
 type NodeDetails struct {
 	Model           string `json:"model"`
-	MeshGateway     bool   `json:"mesh_gateway"`
-	MeshSupernode   bool   `json:"mesh_supernode"`
 	BoardID         string `json:"board_id"`
 	FirmwareMfg     string `json:"firmware_mfg"`
 	FirmwareVersion string `json:"firmware_version"`

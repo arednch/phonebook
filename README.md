@@ -1,5 +1,8 @@
 # Phonebook
 
+> [!CAUTION]
+> **This organization is being sunset and all repositories with it. We'll delete this organization and its repositories in the near future. If you still need any of this code, please fork it ~now.**
+
 Phonebook conversion from CSV to a number of output formats intended to be used for AREDN.
 
 For release notes, see the [release page](https://github.com/arednch/packages/releases) or
